@@ -1,0 +1,1126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RAG Chat</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #1a1a1a;
+      --surface: #242424;
+      --surface2: #2c2c2c;
+      --border: #3a3a3a;
+      --text: #e8e8e8;
+      --text-dim: #999;
+      --accent: #4a9eff;
+      --accent-dim: #1a3a5c;
+      --success: #4caf82;
+      --warning: #e6a817;
+      --error: #e05555;
+      --user-bg: #1e2f45;
+      --font: Georgia, 'Times New Roman', serif;
+      --mono: 'Courier New', Courier, monospace;
+    }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      font-size: 1rem;
+      line-height: 1.6;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .skip-link {
+      position: absolute; left: -9999px; top: 0;
+      background: var(--accent); color: #fff;
+      padding: 0.5rem 1rem; z-index: 999;
+    }
+    .skip-link:focus { left: 0; }
+
+    /* ── Header ── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0.6rem 1rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-shrink: 0;
+      flex-wrap: wrap;
+    }
+    header h1 { font-size: 1.1rem; font-weight: normal; white-space: nowrap; }
+
+    #system-status {
+      font-size: 0.8rem;
+      color: var(--text-dim);
+      margin-left: auto;
+    }
+    #system-status.ok  { color: var(--success); }
+    #system-status.warn { color: var(--warning); }
+    #system-status.err  { color: var(--error); }
+
+    /* ── Layout ── */
+    #app { display: flex; flex: 1; overflow: hidden; }
+
+    /* ── Left sidebar: projects ── */
+    #project-sidebar {
+      width: 220px;
+      flex-shrink: 0;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    #project-sidebar h2 {
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-dim);
+      font-weight: normal;
+      padding: 0.75rem 0.75rem 0.4rem;
+    }
+
+    #project-list {
+      list-style: none;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    #project-list li { border-bottom: 1px solid var(--border); }
+
+    #project-list button.proj-btn {
+      width: 100%;
+      background: transparent;
+      border: none;
+      border-radius: 0;
+      color: var(--text);
+      padding: 0.6rem 0.75rem;
+      text-align: left;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: background 0.1s;
+      outline: none;
+    }
+    #project-list button.proj-btn:hover,
+    #project-list button.proj-btn:focus {
+      background: var(--surface2);
+      outline: 2px solid var(--accent);
+      outline-offset: -2px;
+    }
+    #project-list button.proj-btn[aria-current="true"] {
+      background: var(--accent-dim);
+      border-left: 3px solid var(--accent);
+      color: var(--accent);
+      font-weight: bold;
+    }
+
+    #new-project-area {
+      padding: 0.6rem 0.75rem;
+      border-top: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    input[type="text"], textarea, select {
+      font-family: var(--font);
+      font-size: 0.9rem;
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 0.4rem 0.6rem;
+      width: 100%;
+    }
+    input[type="text"]:focus,
+    textarea:focus,
+    select:focus {
+      outline: 2px solid var(--accent);
+      outline-offset: 1px;
+      border-color: var(--accent);
+    }
+
+    button {
+      font-family: var(--font);
+      font-size: 0.875rem;
+      background: var(--accent-dim);
+      color: var(--accent);
+      border: 1px solid var(--accent);
+      border-radius: 3px;
+      padding: 0.4rem 0.75rem;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    button:hover, button:focus {
+      background: var(--accent);
+      color: #fff;
+      outline: 2px solid #fff;
+      outline-offset: 2px;
+    }
+    button:disabled { opacity: 0.45; cursor: default; }
+
+    button.danger {
+      background: transparent;
+      border-color: var(--error);
+      color: var(--error);
+    }
+    button.danger:hover, button.danger:focus {
+      background: var(--error);
+      color: #fff;
+    }
+
+    button.secondary {
+      background: transparent;
+      border-color: var(--border);
+      color: var(--text-dim);
+    }
+    button.secondary:hover, button.secondary:focus {
+      background: var(--surface2);
+      color: var(--text);
+    }
+
+    /* ── Right info panel ── */
+    #info-panel {
+      width: 220px;
+      flex-shrink: 0;
+      background: var(--surface);
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      padding: 0.75rem;
+      gap: 1rem;
+    }
+
+    .panel-section { display: flex; flex-direction: column; gap: 0.4rem; }
+    .panel-section h2 {
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-dim);
+      font-weight: normal;
+    }
+    .panel-section p, .panel-section li {
+      font-size: 0.82rem;
+      color: var(--text-dim);
+    }
+
+    #indexed-files {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+    #indexed-files li {
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      padding: 0.2rem 0;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    #indexed-files li:last-child { border-bottom: none; }
+    #docs-path {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      word-break: break-all;
+    }
+
+    /* ── Main ── */
+    #main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+    #status-bar {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0.35rem 1rem;
+      font-size: 0.8rem;
+      color: var(--text-dim);
+      min-height: 1.7rem;
+      flex-shrink: 0;
+    }
+
+    #messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.9rem;
+    }
+
+    .message {
+      border-radius: 3px;
+      padding: 0.7rem 0.9rem;
+    }
+    .role-label {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-dim);
+      margin-bottom: 0.3rem;
+      display: block;
+    }
+    .content { white-space: pre-wrap; line-height: 1.65; }
+    .message.user {
+      background: var(--user-bg);
+      border-left: 3px solid var(--accent);
+    }
+    .message.assistant {
+      background: var(--surface);
+      border-left: 3px solid var(--border);
+    }
+    .message.system-msg {
+      background: transparent;
+      border-left: 3px solid var(--warning);
+      color: var(--text-dim);
+      font-size: 0.875rem;
+    }
+
+    .sources {
+      margin-top: 0.5rem;
+      font-size: 0.78rem;
+      color: var(--text-dim);
+    }
+    .sources summary { cursor: pointer; }
+    .sources summary::marker { content: ""; }
+    .sources summary::before { content: "▶ "; font-size: 0.7em; }
+    details[open] > summary::before { content: "▼ "; }
+    .sources ul { list-style: none; margin-top: 0.35rem; }
+    .sources li { font-family: var(--mono); margin-bottom: 0.15rem; }
+    .score { color: var(--accent); }
+
+    .thinking {
+      background: var(--surface);
+      border-left: 3px solid var(--border);
+      padding: 0.7rem 0.9rem;
+      color: var(--text-dim);
+      font-style: italic;
+      border-radius: 3px;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:.5} 50%{opacity:1} }
+
+    /* ── Markdown rendered content ── */
+    .content h1, .content h2, .content h3,
+    .content h4, .content h5, .content h6 {
+      margin: 0.75rem 0 0.35rem;
+      line-height: 1.3;
+      color: var(--text);
+    }
+    .content h1 { font-size: 1.3rem; }
+    .content h2 { font-size: 1.15rem; }
+    .content h3 { font-size: 1.05rem; color: var(--accent); }
+    .content p  { margin: 0.4rem 0; }
+    .content ul, .content ol { margin: 0.4rem 0 0.4rem 1.4rem; }
+    .content li { margin: 0.2rem 0; }
+    .content strong { color: var(--text); }
+    .content em { color: var(--text-dim); font-style: italic; }
+    .content hr { border: none; border-top: 1px solid var(--border); margin: 0.75rem 0; }
+    .content code {
+      font-family: var(--mono);
+      font-size: 0.875em;
+      background: var(--surface2);
+      padding: 0.1em 0.35em;
+      border-radius: 2px;
+    }
+    .content pre {
+      background: var(--surface2);
+      padding: 0.75rem;
+      border-radius: 3px;
+      overflow-x: auto;
+      margin: 0.5rem 0;
+    }
+    .content pre code { background: none; padding: 0; }
+    .content blockquote {
+      border-left: 3px solid var(--accent);
+      margin: 0.5rem 0;
+      padding: 0.1rem 0.75rem;
+      color: var(--text-dim);
+    }
+
+    /* ── Input area ── */
+    #input-area {
+      border-top: 1px solid var(--border);
+      padding: 0.6rem 0.75rem;
+      display: flex;
+      gap: 0.5rem;
+      flex-shrink: 0;
+      background: var(--surface);
+    }
+    #user-input {
+      flex: 1;
+      resize: vertical;
+      min-height: 2.6rem;
+      max-height: 9rem;
+      font-size: 1rem;
+      line-height: 1.5;
+      padding: 0.5rem 0.65rem;
+    }
+    #send-btn { align-self: flex-end; padding: 0.5rem 1rem; font-size: 1rem; }
+    #clear-btn { align-self: flex-end; }
+    #clear-btn.secondary { font-size: 0.85rem; }
+
+    /* ── Settings dialog ── */
+    dialog {
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1.5rem;
+      max-width: 520px;
+      width: 90vw;
+      font-family: var(--font);
+    }
+    dialog::backdrop { background: rgba(0,0,0,0.6); }
+    dialog h2 { font-size: 1.1rem; margin-bottom: 1rem; font-weight: normal; }
+
+    .field { display: flex; flex-direction: column; gap: 0.3rem; margin-bottom: 0.85rem; }
+    .field label { font-size: 0.85rem; color: var(--text-dim); }
+    .field input, .field textarea, .field select { width: 100%; }
+    .field textarea { min-height: 5rem; resize: vertical; }
+    .field small { font-size: 0.75rem; color: var(--text-dim); }
+
+    .dialog-actions {
+      display: flex;
+      gap: 0.5rem;
+      justify-content: flex-end;
+      margin-top: 1rem;
+    }
+
+    /* ── Project action bar ── */
+    #project-actions {
+      display: flex;
+      gap: 0.4rem;
+      padding: 0.5rem 0.75rem;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    #current-project-name {
+      font-size: 0.95rem;
+      margin-right: auto;
+      color: var(--text);
+    }
+
+    .sr-only {
+      position: absolute; width: 1px; height: 1px;
+      padding: 0; margin: -1px; overflow: hidden;
+      clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+    }
+
+    #no-project-msg {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-dim);
+      font-size: 1rem;
+      padding: 2rem;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+<a href="#user-input" class="skip-link">Skip to message input</a>
+
+<header>
+  <h1>RAG Chat</h1>
+  <span id="system-status" role="status" aria-live="polite">Checking…</span>
+</header>
+
+<div id="app">
+
+  <!-- Project list sidebar -->
+  <nav id="project-sidebar" aria-label="Projects">
+    <h2>Projects</h2>
+    <ul id="project-list" aria-label="Project list">
+      <li><span style="padding:0.5rem 0.75rem;display:block;font-size:0.85rem;color:var(--text-dim);">Loading…</span></li>
+    </ul>
+    <div id="new-project-area">
+      <label for="new-project-name" class="sr-only">New project name</label>
+      <input type="text" id="new-project-name" placeholder="New project name…" autocomplete="off" />
+      <button id="create-project-btn" aria-label="Create new project">Create Project</button>
+    </div>
+  </nav>
+
+  <!-- Main area -->
+  <main id="main">
+
+    <!-- No project selected -->
+    <div id="no-project-msg" role="status">
+      Create or select a project to begin.
+    </div>
+
+    <!-- Chat area (hidden until project selected) -->
+    <div id="chat-area" hidden>
+
+      <div id="project-actions">
+        <span id="current-project-name" aria-live="polite"></span>
+        <button id="rename-project-btn" class="secondary" aria-label="Rename current project">Rename</button>
+        <button id="reindex-btn" class="secondary" aria-label="Re-index documents for current project">Re-index</button>
+        <button id="settings-btn" class="secondary" aria-label="Open settings">Settings</button>
+        <button id="delete-project-btn" class="danger" aria-label="Delete current project">Delete</button>
+      </div>
+
+      <div id="status-bar" aria-live="polite" role="status"></div>
+
+      <section id="messages" aria-label="Conversation" aria-live="polite" aria-relevant="additions"></section>
+
+      <div id="input-area">
+        <label for="user-input" class="sr-only">Your message</label>
+        <textarea
+          id="user-input"
+          placeholder="Ask a question… (Enter to send, Shift+Enter for new line)"
+          rows="2"
+          aria-describedby="input-hint"
+        ></textarea>
+        <span id="input-hint" class="sr-only">Press Enter to send. Shift+Enter inserts a new line.</span>
+        <button id="send-btn" aria-label="Send message">Send</button>
+        <button id="clear-btn" class="secondary" aria-label="Clear conversation">Clear</button>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Right info panel -->
+  <aside id="info-panel" aria-label="Index information">
+    <div class="panel-section">
+      <h2>Indexed Files</h2>
+      <p id="chunk-count" aria-live="polite">—</p>
+      <ul id="indexed-files" aria-label="Indexed files"></ul>
+    </div>
+    <div class="panel-section">
+      <h2>Docs Folder</h2>
+      <p id="docs-path" aria-label="Documents folder path">Select a project.</p>
+    </div>
+    <div class="panel-section">
+      <h2>Model</h2>
+      <p id="model-info" style="font-family:var(--mono);font-size:0.78rem;">—</p>
+      <p id="embed-info" style="font-family:var(--mono);font-size:0.78rem;">—</p>
+    </div>
+    <div class="panel-section">
+      <h2>Session Logs</h2>
+      <p id="session-id-display" style="font-size:0.78rem;font-family:var(--mono);color:var(--text-dim);">—</p>
+      <ul id="log-files" aria-label="Saved log files" style="list-style:none;display:flex;flex-direction:column;gap:0.25rem;"></ul>
+    </div>
+  </aside>
+
+</div>
+
+<!-- Settings dialog -->
+<dialog id="settings-dialog" aria-labelledby="settings-title">
+  <h2 id="settings-title">Settings</h2>
+
+  <h3 style="font-size:0.85rem;font-weight:normal;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:0.75rem;">Global Defaults</h3>
+
+  <div class="field">
+    <label for="s-api-key">OpenRouter API Key</label>
+    <input type="password" id="s-api-key" placeholder="Leave blank to keep current key" autocomplete="off" />
+    <small id="s-key-masked"></small>
+  </div>
+  <div class="field">
+    <label for="s-model">Default Model</label>
+    <input type="text" id="s-model" placeholder="e.g. openai/gpt-4o-mini" />
+    <small>Find model slugs at openrouter.ai/models</small>
+  </div>
+  <div class="field">
+    <label for="s-ollama-url">Ollama Base URL</label>
+    <input type="text" id="s-ollama-url" placeholder="http://localhost:11434" />
+  </div>
+  <div class="field">
+    <label for="s-embed-model">Ollama Embedding Model</label>
+    <input type="text" id="s-embed-model" placeholder="nomic-embed-text" />
+    <small>Change requires re-indexing all projects.</small>
+  </div>
+  <div class="field">
+    <label for="s-chunk-size">Chunk Size (words)</label>
+    <input type="text" id="s-chunk-size" />
+  </div>
+  <div class="field">
+    <label for="s-overlap">Chunk Overlap (words)</label>
+    <input type="text" id="s-overlap" />
+  </div>
+  <div class="field">
+    <label for="s-topk">Default Top K Results</label>
+    <input type="text" id="s-topk" />
+  </div>
+  <div class="field">
+    <label for="s-system">Default System Prompt</label>
+    <textarea id="s-system"></textarea>
+  </div>
+
+  <hr style="border:none;border-top:1px solid var(--border);margin:1rem 0;" />
+
+  <div id="project-settings-section" hidden>
+    <h3 style="font-size:0.85rem;font-weight:normal;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:0.4rem;">Project Overrides</h3>
+    <p id="project-settings-name" style="font-size:0.85rem;color:var(--text-dim);margin-bottom:0.75rem;"></p>
+    <p style="font-size:0.78rem;color:var(--text-dim);margin-bottom:0.75rem;">Leave a field blank to inherit the global default.</p>
+    <div class="field">
+      <label for="ps-model">Model</label>
+      <input type="text" id="ps-model" placeholder="Leave blank to use global default" />
+      <small id="ps-model-hint"></small>
+    </div>
+    <div class="field">
+      <label for="ps-topk">Top K Results</label>
+      <input type="text" id="ps-topk" placeholder="Leave blank to use global default" />
+      <small id="ps-topk-hint"></small>
+    </div>
+    <div class="field">
+      <label for="ps-system">System Prompt</label>
+      <textarea id="ps-system" placeholder="Leave blank to use global default"></textarea>
+      <small id="ps-system-hint"></small>
+    </div>
+  </div>
+
+  <div class="dialog-actions">
+    <button id="settings-cancel-btn" class="secondary">Cancel</button>
+    <button id="settings-save-btn">Save Settings</button>
+  </div>
+</dialog>
+
+<!-- Rename dialog -->
+<dialog id="rename-dialog" aria-labelledby="rename-title">
+  <h2 id="rename-title">Rename Project</h2>
+  <div class="field">
+    <label for="rename-input">New name</label>
+    <input type="text" id="rename-input" />
+  </div>
+  <div class="dialog-actions">
+    <button id="rename-cancel-btn" class="secondary">Cancel</button>
+    <button id="rename-save-btn">Rename</button>
+  </div>
+</dialog>
+
+<script>
+// ── State ────────────────────────────────────────────────────────────────────
+let projects = [];
+let currentProjectId = null;
+let conversationHistories = {};  // { pid: [messages] }
+let isThinking = false;
+
+// Session ID: one per calendar day, resets at midnight
+function todaySessionId() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+let currentSessionId = todaySessionId();
+
+// Configure marked for safe rendering
+marked.setOptions({ breaks: true, gfm: true });
+
+// ── Elements ──────────────────────────────────────────────────────────────────
+const projectList      = document.getElementById('project-list');
+const newProjectName   = document.getElementById('new-project-name');
+const createProjectBtn = document.getElementById('create-project-btn');
+const noProjectMsg     = document.getElementById('no-project-msg');
+const chatArea         = document.getElementById('chat-area');
+const currentProjName  = document.getElementById('current-project-name');
+const renameBtn        = document.getElementById('rename-project-btn');
+const reindexBtn       = document.getElementById('reindex-btn');
+const settingsBtn      = document.getElementById('settings-btn');
+const deleteBtn        = document.getElementById('delete-project-btn');
+const statusBar        = document.getElementById('status-bar');
+const messagesEl       = document.getElementById('messages');
+const userInput        = document.getElementById('user-input');
+const sendBtn          = document.getElementById('send-btn');
+const clearBtn         = document.getElementById('clear-btn');
+const systemStatus     = document.getElementById('system-status');
+const chunkCount       = document.getElementById('chunk-count');
+const indexedFiles     = document.getElementById('indexed-files');
+const docsPath         = document.getElementById('docs-path');
+const modelInfo        = document.getElementById('model-info');
+const embedInfo        = document.getElementById('embed-info');
+
+const settingsDialog   = document.getElementById('settings-dialog');
+const renameDialog     = document.getElementById('rename-dialog');
+
+// ── Utilities ─────────────────────────────────────────────────────────────────
+function setStatus(msg) { statusBar.textContent = msg; }
+
+function scrollBottom() { messagesEl.scrollTop = messagesEl.scrollHeight; }
+
+function setInputDisabled(v) {
+  userInput.disabled = v;
+  sendBtn.disabled = v;
+  isThinking = v;
+}
+
+// ── System status ─────────────────────────────────────────────────────────────
+async function loadSystemStatus() {
+  try {
+    const r = await fetch('/api/status');
+    const d = await r.json();
+    modelInfo.textContent = 'LLM: ' + d.model;
+    embedInfo.textContent = 'Embed: ' + d.embed_model;
+    if (!d.openrouter_key_set) {
+      systemStatus.textContent = '● No API key';
+      systemStatus.className = 'err';
+    } else if (!d.ollama_ok) {
+      systemStatus.textContent = '● Ollama not ready';
+      systemStatus.className = 'warn';
+      setStatus(d.ollama_message);
+    } else {
+      systemStatus.textContent = '● Ready';
+      systemStatus.className = 'ok';
+    }
+  } catch {
+    systemStatus.textContent = '● Server error';
+    systemStatus.className = 'err';
+  }
+}
+
+// ── Project list ──────────────────────────────────────────────────────────────
+async function loadProjects() {
+  const r = await fetch('/api/projects');
+  projects = await r.json();
+  renderProjectList();
+}
+
+function renderProjectList() {
+  projectList.innerHTML = '';
+  if (projects.length === 0) {
+    const li = document.createElement('li');
+    li.innerHTML = '<span style="padding:0.5rem 0.75rem;display:block;font-size:0.85rem;color:var(--text-dim);">No projects yet.</span>';
+    projectList.appendChild(li);
+    return;
+  }
+  for (const proj of projects) {
+    const li = document.createElement('li');
+    const btn = document.createElement('button');
+    btn.className = 'proj-btn';
+    btn.textContent = proj.name;
+    btn.setAttribute('aria-label', `Open project: ${proj.name}`);
+    btn.setAttribute('aria-current', currentProjectId === proj.id ? 'true' : 'false');
+    btn.addEventListener('click', () => selectProject(proj.id));
+    li.appendChild(btn);
+    projectList.appendChild(li);
+  }
+}
+
+// ── Select project ────────────────────────────────────────────────────────────
+async function selectProject(pid) {
+  currentProjectId = pid;
+  conversationHistories[pid] = conversationHistories[pid] || [];
+
+  renderProjectList();
+
+  const proj = projects.find(p => p.id === pid);
+  currentProjName.textContent = proj ? proj.name : pid;
+
+  noProjectMsg.hidden = true;
+  chatArea.hidden = false;
+
+  renderMessages(pid);
+  await loadProjectStatus(pid);
+  userInput.focus();
+}
+
+// ── Project index status ──────────────────────────────────────────────────────
+async function loadProjectStatus(pid) {
+  if (!pid) return;
+  try {
+    const r = await fetch(`/api/projects/${pid}/status`);
+    const d = await r.json();
+
+    chunkCount.textContent = `${d.chunk_count} chunk${d.chunk_count !== 1 ? 's' : ''} indexed`;
+
+    indexedFiles.innerHTML = '';
+    if (!d.indexed_files || d.indexed_files.length === 0) {
+      const li = document.createElement('li');
+      li.textContent = 'No files indexed.';
+      indexedFiles.appendChild(li);
+    } else {
+      for (const f of d.indexed_files) {
+        const li = document.createElement('li');
+        li.textContent = f;
+        li.title = f;
+        indexedFiles.appendChild(li);
+      }
+    }
+
+    const proj = projects.find(p => p.id === pid);
+    docsPath.textContent = proj ? proj.docs_folder : '—';
+
+    // Session info
+    document.getElementById('session-id-display').textContent = 'Today: ' + currentSessionId;
+
+    // Log files
+    const logList = document.getElementById('log-files');
+    logList.innerHTML = '';
+    try {
+      const lr = await fetch(`/api/projects/${pid}/logs`);
+      const logs = await lr.json();
+      if (!logs.length) {
+        const li = document.createElement('li');
+        li.style.fontSize = '0.78rem';
+        li.style.color = 'var(--text-dim)';
+        li.textContent = 'No logs yet.';
+        logList.appendChild(li);
+      } else {
+        for (const log of logs) {
+          const li = document.createElement('li');
+          li.style.fontSize = '0.78rem';
+          li.style.fontFamily = 'var(--mono)';
+          li.style.color = 'var(--text-dim)';
+          li.textContent = log.filename;
+          li.title = `${log.filename} (${Math.round(log.size/1024)}KB)`;
+          logList.appendChild(li);
+        }
+      }
+    } catch { /* ignore log fetch errors */ }
+
+  } catch { /* ignore */ }
+}
+
+// ── Messages ──────────────────────────────────────────────────────────────────
+function renderMessages(pid) {
+  messagesEl.innerHTML = '';
+  const history = conversationHistories[pid] || [];
+  if (history.length === 0) {
+    const div = document.createElement('div');
+    div.className = 'message system-msg';
+    div.setAttribute('role', 'note');
+    div.textContent = 'No messages yet. Ask a question to get started.';
+    messagesEl.appendChild(div);
+  } else {
+    for (const msg of history) {
+      if (msg._sources !== undefined) {
+        addMessageEl(msg.role, msg.content, msg._sources);
+      } else {
+        addMessageEl(msg.role, msg.content);
+      }
+    }
+  }
+  scrollBottom();
+}
+
+function addMessageEl(role, content, sources) {
+  const div = document.createElement('div');
+  div.classList.add('message', role === 'user' ? 'user' : 'assistant');
+
+  const label = document.createElement('span');
+  label.className = 'role-label';
+  label.textContent = role === 'user' ? 'You' : 'Assistant';
+  div.appendChild(label);
+
+  const contentEl = document.createElement('div');
+  contentEl.className = 'content';
+  if (role === 'assistant') {
+    // Render markdown to HTML for assistant messages
+    contentEl.innerHTML = marked.parse(content);
+  } else {
+    contentEl.textContent = content;
+  }
+  div.appendChild(contentEl);
+
+  if (sources && sources.length > 0) {
+    const details = document.createElement('details');
+    details.className = 'sources';
+    const summary = document.createElement('summary');
+    summary.textContent = `Sources (${sources.length})`;
+    details.appendChild(summary);
+    const ul = document.createElement('ul');
+    sources.forEach(s => {
+      const li = document.createElement('li');
+      li.textContent = `${s.filename} `;
+      const score = document.createElement('span');
+      score.className = 'score';
+      score.textContent = `(${(s.score * 100).toFixed(1)}% match)`;
+      li.appendChild(score);
+      ul.appendChild(li);
+    });
+    details.appendChild(ul);
+    div.appendChild(details);
+  }
+
+  messagesEl.appendChild(div);
+  scrollBottom();
+  return div;
+}
+
+function addThinking() {
+  const div = document.createElement('div');
+  div.className = 'thinking';
+  div.setAttribute('role', 'status');
+  div.setAttribute('aria-label', 'Assistant is thinking');
+  div.textContent = 'Thinking…';
+  messagesEl.appendChild(div);
+  scrollBottom();
+  return div;
+}
+
+// ── Send ──────────────────────────────────────────────────────────────────────
+async function sendMessage() {
+  if (!currentProjectId || isThinking) return;
+  const text = userInput.value.trim();
+  if (!text) return;
+
+  userInput.value = '';
+  userInput.style.height = 'auto';
+
+  const history = conversationHistories[currentProjectId];
+  const userMsg = { role: 'user', content: text };
+  history.push(userMsg);
+  addMessageEl('user', text);
+
+  setInputDisabled(true);
+  const thinkingEl = addThinking();
+
+  try {
+    const r = await fetch(`/api/projects/${currentProjectId}/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messages: history.map(m => ({ role: m.role, content: m.content })),
+        session_id: currentSessionId
+      })
+    });
+    const data = await r.json();
+    thinkingEl.remove();
+
+    if (data.error) {
+      const errDiv = document.createElement('div');
+      errDiv.className = 'message system-msg';
+      errDiv.setAttribute('role', 'alert');
+      errDiv.textContent = 'Error: ' + data.error;
+      messagesEl.appendChild(errDiv);
+    } else {
+      const assistantMsg = { role: 'assistant', content: data.reply, _sources: data.sources };
+      history.push(assistantMsg);
+      addMessageEl('assistant', data.reply, data.sources);
+    }
+  } catch {
+    thinkingEl.remove();
+    const errDiv = document.createElement('div');
+    errDiv.className = 'message system-msg';
+    errDiv.setAttribute('role', 'alert');
+    errDiv.textContent = 'Network error. Is the server running?';
+    messagesEl.appendChild(errDiv);
+  } finally {
+    setInputDisabled(false);
+    userInput.focus();
+  }
+}
+
+// ── Create project ────────────────────────────────────────────────────────────
+createProjectBtn.addEventListener('click', async () => {
+  const name = newProjectName.value.trim();
+  if (!name) { newProjectName.focus(); return; }
+  createProjectBtn.disabled = true;
+  try {
+    const r = await fetch('/api/projects', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name })
+    });
+    const d = await r.json();
+    if (d.error) { alert(d.error); return; }
+    newProjectName.value = '';
+    await loadProjects();
+    selectProject(d.id);
+    setStatus(`Project "${name}" created. Add .txt or .md files to: ${d.docs_folder}`);
+  } finally {
+    createProjectBtn.disabled = false;
+  }
+});
+
+newProjectName.addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); createProjectBtn.click(); }
+});
+
+// ── Rename ────────────────────────────────────────────────────────────────────
+renameBtn.addEventListener('click', () => {
+  const proj = projects.find(p => p.id === currentProjectId);
+  document.getElementById('rename-input').value = proj ? proj.name : '';
+  renameDialog.showModal();
+  document.getElementById('rename-input').focus();
+});
+
+document.getElementById('rename-cancel-btn').addEventListener('click', () => renameDialog.close());
+
+document.getElementById('rename-save-btn').addEventListener('click', async () => {
+  const name = document.getElementById('rename-input').value.trim();
+  if (!name) return;
+  const r = await fetch(`/api/projects/${currentProjectId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name })
+  });
+  const d = await r.json();
+  if (d.error) { alert(d.error); return; }
+  renameDialog.close();
+  await loadProjects();
+  const proj = projects.find(p => p.id === currentProjectId);
+  currentProjName.textContent = proj ? proj.name : currentProjectId;
+});
+
+// ── Delete ────────────────────────────────────────────────────────────────────
+deleteBtn.addEventListener('click', async () => {
+  const proj = projects.find(p => p.id === currentProjectId);
+  const name = proj ? proj.name : currentProjectId;
+  if (!confirm(`Delete project "${name}" and all its indexed documents? This cannot be undone.`)) return;
+  const r = await fetch(`/api/projects/${currentProjectId}`, { method: 'DELETE' });
+  const d = await r.json();
+  if (d.error) { alert(d.error); return; }
+  delete conversationHistories[currentProjectId];
+  currentProjectId = null;
+  chatArea.hidden = true;
+  noProjectMsg.hidden = false;
+  await loadProjects();
+  chunkCount.textContent = '—';
+  indexedFiles.innerHTML = '';
+  docsPath.textContent = 'Select a project.';
+});
+
+// ── Re-index ──────────────────────────────────────────────────────────────────
+reindexBtn.addEventListener('click', async () => {
+  if (!currentProjectId) return;
+  reindexBtn.disabled = true;
+  setStatus('Re-indexing started…');
+  try {
+    const r = await fetch(`/api/projects/${currentProjectId}/reindex`, { method: 'POST' });
+    const d = await r.json();
+    setStatus(d.message || 'Re-indexing started.');
+    setTimeout(async () => {
+      await loadProjectStatus(currentProjectId);
+      reindexBtn.disabled = false;
+      setStatus('');
+    }, 6000);
+  } catch {
+    setStatus('Re-index request failed.');
+    reindexBtn.disabled = false;
+  }
+});
+
+// ── Clear conversation ────────────────────────────────────────────────────────
+clearBtn.addEventListener('click', () => {
+  if (!currentProjectId) return;
+  conversationHistories[currentProjectId] = [];
+  renderMessages(currentProjectId);
+  userInput.focus();
+});
+
+// ── Send / input ──────────────────────────────────────────────────────────────
+sendBtn.addEventListener('click', sendMessage);
+userInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+});
+userInput.addEventListener('input', () => {
+  userInput.style.height = 'auto';
+  userInput.style.height = Math.min(userInput.scrollHeight, 144) + 'px';
+});
+
+// ── Settings ──────────────────────────────────────────────────────────────────
+settingsBtn.addEventListener('click', async () => {
+  const r = await fetch('/api/settings');
+  const d = await r.json();
+  document.getElementById('s-api-key').value = '';
+  document.getElementById('s-key-masked').textContent = d.openrouter_api_key_masked
+    ? `Current: ${d.openrouter_api_key_masked}`
+    : 'No key set.';
+  document.getElementById('s-model').value = d.openrouter_model || '';
+  document.getElementById('s-ollama-url').value = d.ollama_base_url || '';
+  document.getElementById('s-embed-model').value = d.ollama_embed_model || '';
+  document.getElementById('s-chunk-size').value = d.chunk_size || '';
+  document.getElementById('s-overlap').value = d.chunk_overlap || '';
+  document.getElementById('s-topk').value = d.top_k_results || '';
+  document.getElementById('s-system').value = d.system_prompt || '';
+
+  // Project overrides section
+  const projSection = document.getElementById('project-settings-section');
+  if (currentProjectId) {
+    const proj = projects.find(p => p.id === currentProjectId);
+    document.getElementById('project-settings-name').textContent =
+      `Project: ${proj ? proj.name : currentProjectId}`;
+    projSection.hidden = false;
+
+    const pr = await fetch(`/api/projects/${currentProjectId}/settings`);
+    const pd = await pr.json();
+    const ov = pd.overrides || {};
+    const gl = pd.global || {};
+
+    document.getElementById('ps-model').value = ov.openrouter_model || '';
+    document.getElementById('ps-model-hint').textContent = `Global default: ${gl.openrouter_model || '—'}`;
+
+    document.getElementById('ps-topk').value = ov.top_k_results != null ? ov.top_k_results : '';
+    document.getElementById('ps-topk-hint').textContent = `Global default: ${gl.top_k_results || '—'}`;
+
+    document.getElementById('ps-system').value = ov.system_prompt || '';
+    document.getElementById('ps-system-hint').textContent =
+      ov.system_prompt ? 'Currently overriding global.' : 'Currently using global default.';
+  } else {
+    projSection.hidden = true;
+  }
+
+  settingsDialog.showModal();
+  document.getElementById('s-api-key').focus();
+});
+
+document.getElementById('settings-cancel-btn').addEventListener('click', () => settingsDialog.close());
+
+document.getElementById('settings-save-btn').addEventListener('click', async () => {
+  // Save global settings
+  const payload = {
+    openrouter_model:   document.getElementById('s-model').value,
+    ollama_base_url:    document.getElementById('s-ollama-url').value,
+    ollama_embed_model: document.getElementById('s-embed-model').value,
+    chunk_size:         document.getElementById('s-chunk-size').value,
+    chunk_overlap:      document.getElementById('s-overlap').value,
+    top_k_results:      document.getElementById('s-topk').value,
+    system_prompt:      document.getElementById('s-system').value,
+  };
+  const key = document.getElementById('s-api-key').value.trim();
+  if (key) payload.openrouter_api_key = key;
+
+  const r = await fetch('/api/settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  const d = await r.json();
+  if (d.error) { alert(d.error); return; }
+
+  // Save project overrides if a project is selected
+  if (currentProjectId && !document.getElementById('project-settings-section').hidden) {
+    const projPayload = {
+      openrouter_model: document.getElementById('ps-model').value.trim() || null,
+      top_k_results:    document.getElementById('ps-topk').value.trim() || null,
+      system_prompt:    document.getElementById('ps-system').value.trim() || null,
+    };
+    await fetch(`/api/projects/${currentProjectId}/settings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(projPayload)
+    });
+  }
+
+  settingsDialog.close();
+  await loadSystemStatus();
+  setStatus('Settings saved.');
+});
+
+// Close dialogs on Escape (native dialog behavior handles this)
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+(async () => {
+  await loadSystemStatus();
+  await loadProjects();
+  setInterval(loadSystemStatus, 30000);
+  if (currentProjectId) setInterval(() => loadProjectStatus(currentProjectId), 15000);
+})();
+</script>
+
+</body>
+</html>
