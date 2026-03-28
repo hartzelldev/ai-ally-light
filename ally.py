@@ -408,7 +408,7 @@ def index():
     return send_from_directory("static", "index.html")
 
 # System status
-@app.route("/api/status")
+@app.route("/api/ally/status")
 def api_status():
     ollama_ok, ollama_msg = check_ollama()
     return jsonify({
@@ -420,7 +420,7 @@ def api_status():
     })
 
 # Settings
-@app.route("/api/settings", methods=["GET"])
+@app.route("/api/ally/settings", methods=["GET"])
 def api_get_settings():
     safe = dict(config)
     key = safe.get("openrouter_api_key", "")
@@ -428,7 +428,7 @@ def api_get_settings():
     safe["openrouter_api_key"] = ""  # never send the real key to browser
     return jsonify(safe)
 
-@app.route("/api/settings", methods=["POST"])
+@app.route("/api/ally/settings", methods=["POST"])
 def api_save_settings():
     data = request.json
     editable = [
@@ -449,12 +449,11 @@ def api_save_settings():
     return jsonify({"success": True})
 
 # Project settings (overrides only)
-@app.route("/api/projects/<pid>/settings", methods=["GET"])
+@app.route("/api/ally/projects/<pid>/settings", methods=["GET"])
 def api_get_project_settings(pid):
     if pid not in load_projects():
         return jsonify({"error": "Project not found."}), 404
     overrides = load_project_config(pid)
-    # Return effective values alongside which are overridden
     eff = effective_config(pid)
     return jsonify({
         "effective": {k: eff.get(k) for k in PROJECT_OVERRIDABLE},
@@ -462,7 +461,7 @@ def api_get_project_settings(pid):
         "global": {k: config.get(k) for k in PROJECT_OVERRIDABLE},
     })
 
-@app.route("/api/projects/<pid>/settings", methods=["POST"])
+@app.route("/api/ally/projects/<pid>/settings", methods=["POST"])
 def api_save_project_settings(pid):
     if pid not in load_projects():
         return jsonify({"error": "Project not found."}), 404
@@ -472,7 +471,6 @@ def api_save_project_settings(pid):
         if key in data:
             val = data[key]
             if val is None or str(val).strip() == "":
-                # Empty = remove override, fall back to global
                 overrides.pop(key, None)
             else:
                 if key == "top_k_results":
@@ -485,7 +483,7 @@ def api_save_project_settings(pid):
     return jsonify({"success": True})
 
 # Projects list
-@app.route("/api/projects", methods=["GET"])
+@app.route("/api/ally/projects", methods=["GET"])
 def api_list_projects():
     projects = load_projects()
     return jsonify([
@@ -499,7 +497,7 @@ def api_list_projects():
     ])
 
 # Create project
-@app.route("/api/projects", methods=["POST"])
+@app.route("/api/ally/projects", methods=["POST"])
 def api_create_project():
     data = request.json
     name = (data.get("name") or "").strip()
@@ -522,7 +520,7 @@ def api_create_project():
     return jsonify({"id": pid, "name": name, "docs_folder": str(project_docs_dir(pid))})
 
 # Rename project
-@app.route("/api/projects/<pid>", methods=["PUT"])
+@app.route("/api/ally/projects/<pid>", methods=["PUT"])
 def api_rename_project(pid):
     projects = load_projects()
     if pid not in projects:
@@ -535,13 +533,12 @@ def api_rename_project(pid):
     return jsonify({"success": True})
 
 # Delete project
-@app.route("/api/projects/<pid>", methods=["DELETE"])
+@app.route("/api/ally/projects/<pid>", methods=["DELETE"])
 def api_delete_project(pid):
     projects = load_projects()
     if pid not in projects:
         return jsonify({"error": "Project not found."}), 404
     stop_watcher(pid)
-    # Evict the cached client so the folder can be deleted cleanly
     _chroma_clients.pop(pid, None)
     proj_folder = PROJECTS_DIR / pid
     if proj_folder.exists():
@@ -552,14 +549,14 @@ def api_delete_project(pid):
     return jsonify({"success": True})
 
 # Project index status
-@app.route("/api/projects/<pid>/status")
+@app.route("/api/ally/projects/<pid>/status")
 def api_project_status(pid):
     if pid not in load_projects():
         return jsonify({"error": "Project not found."}), 404
     return jsonify(get_project_index_status(pid))
 
 # Re-index project
-@app.route("/api/projects/<pid>/reindex", methods=["POST"])
+@app.route("/api/ally/projects/<pid>/reindex", methods=["POST"])
 def api_reindex(pid):
     if pid not in load_projects():
         return jsonify({"error": "Project not found."}), 404
@@ -571,7 +568,7 @@ def api_reindex(pid):
     return jsonify({"success": True, "message": "Re-indexing started."})
 
 # List logs for a project
-@app.route("/api/projects/<pid>/logs")
+@app.route("/api/ally/projects/<pid>/logs")
 def api_list_logs(pid):
     if pid not in load_projects():
         return jsonify({"error": "Project not found."}), 404
@@ -583,7 +580,7 @@ def api_list_logs(pid):
     ])
 
 # Chat
-@app.route("/api/projects/<pid>/chat", methods=["POST"])
+@app.route("/api/ally/projects/<pid>/chat", methods=["POST"])
 def api_chat(pid):
     if pid not in load_projects():
         return jsonify({"error": "Project not found."}), 404

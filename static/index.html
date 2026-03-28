@@ -437,6 +437,7 @@
 
 <header>
   <h1>AI Ally Light</h1>
+  <button id="default-settings-btn" class="secondary" aria-label="Open default settings for all projects">Default Settings</button>
   <span id="system-status" role="status" aria-live="polite">Checking…</span>
 </header>
 
@@ -470,7 +471,7 @@
         <span id="current-project-name" aria-live="polite"></span>
         <button id="rename-project-btn" class="secondary" aria-label="Rename current project">Rename</button>
         <button id="reindex-btn" class="secondary" aria-label="Re-index documents for current project">Re-index</button>
-        <button id="settings-btn" class="secondary" aria-label="Open AI Ally Light settings">Settings</button>
+        <button id="settings-btn" class="secondary" aria-label="Open project-specific settings">Project Settings</button>
         <button id="delete-project-btn" class="danger" aria-label="Delete current project">Delete</button>
       </div>
 
@@ -521,49 +522,50 @@
 
 <!-- Settings dialog -->
 <dialog id="settings-dialog" aria-labelledby="settings-title">
-  <h2 id="settings-title">AI Ally Light Settings</h2>
+  <h2 id="settings-title">Default Settings</h2>
 
-  <h3 style="font-size:0.85rem;font-weight:normal;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:0.75rem;">Global Defaults</h3>
+  <h3 id="global-settings-header" style="font-size:0.85rem;font-weight:normal;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:0.75rem;">Global Defaults</h3>
 
-  <div class="field">
-    <label for="s-api-key">OpenRouter API Key</label>
-    <input type="password" id="s-api-key" placeholder="Leave blank to keep current key" autocomplete="off" />
-    <small id="s-key-masked"></small>
+  <div id="global-settings-fields">
+    <div class="field">
+      <label for="s-api-key">OpenRouter API Key</label>
+      <input type="password" id="s-api-key" placeholder="Leave blank to keep current key" autocomplete="off" />
+      <small id="s-key-masked"></small>
+    </div>
+    <div class="field">
+      <label for="s-model">Default Model</label>
+      <input type="text" id="s-model" placeholder="e.g. openai/gpt-4o-mini" />
+      <small>Find model slugs at openrouter.ai/models</small>
+    </div>
+    <div class="field">
+      <label for="s-ollama-url">Ollama Base URL</label>
+      <input type="text" id="s-ollama-url" placeholder="http://localhost:11434" />
+    </div>
+    <div class="field">
+      <label for="s-embed-model">Ollama Embedding Model</label>
+      <input type="text" id="s-embed-model" placeholder="nomic-embed-text" />
+      <small>Change requires re-indexing all projects.</small>
+    </div>
+    <div class="field">
+      <label for="s-chunk-size">Chunk Size (words)</label>
+      <input type="text" id="s-chunk-size" />
+    </div>
+    <div class="field">
+      <label for="s-overlap">Chunk Overlap (words)</label>
+      <input type="text" id="s-overlap" />
+    </div>
+    <div class="field">
+      <label for="s-topk">Default Top K Results</label>
+      <input type="text" id="s-topk" />
+    </div>
+    <div class="field">
+      <label for="s-system">Default System Prompt</label>
+      <textarea id="s-system"></textarea>
+    </div>
   </div>
-  <div class="field">
-    <label for="s-model">Default Model</label>
-    <input type="text" id="s-model" placeholder="e.g. openai/gpt-4o-mini" />
-    <small>Find model slugs at openrouter.ai/models</small>
-  </div>
-  <div class="field">
-    <label for="s-ollama-url">Ollama Base URL</label>
-    <input type="text" id="s-ollama-url" placeholder="http://localhost:11434" />
-  </div>
-  <div class="field">
-    <label for="s-embed-model">Ollama Embedding Model</label>
-    <input type="text" id="s-embed-model" placeholder="nomic-embed-text" />
-    <small>Change requires re-indexing all projects.</small>
-  </div>
-  <div class="field">
-    <label for="s-chunk-size">Chunk Size (words)</label>
-    <input type="text" id="s-chunk-size" />
-  </div>
-  <div class="field">
-    <label for="s-overlap">Chunk Overlap (words)</label>
-    <input type="text" id="s-overlap" />
-  </div>
-  <div class="field">
-    <label for="s-topk">Default Top K Results</label>
-    <input type="text" id="s-topk" />
-  </div>
-  <div class="field">
-    <label for="s-system">Default System Prompt</label>
-    <textarea id="s-system"></textarea>
-  </div>
-
-  <hr style="border:none;border-top:1px solid var(--border);margin:1rem 0;" />
 
   <div id="project-settings-section" hidden>
+    <hr style="border:none;border-top:1px solid var(--border);margin:1rem 0;" />
     <h3 style="font-size:0.85rem;font-weight:normal;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:0.4rem;">Project Overrides</h3>
     <p id="project-settings-name" style="font-size:0.85rem;color:var(--text-dim);margin-bottom:0.75rem;"></p>
     <p style="font-size:0.78rem;color:var(--text-dim);margin-bottom:0.75rem;">Leave a field blank to inherit the global default.</p>
@@ -630,6 +632,7 @@ const currentProjName  = document.getElementById('current-project-name');
 const renameBtn        = document.getElementById('rename-project-btn');
 const reindexBtn       = document.getElementById('reindex-btn');
 const settingsBtn      = document.getElementById('settings-btn');
+const defaultSettingsBtn = document.getElementById('default-settings-btn');
 const deleteBtn        = document.getElementById('delete-project-btn');
 const statusBar        = document.getElementById('status-bar');
 const messagesEl       = document.getElementById('messages');
@@ -971,7 +974,7 @@ deleteBtn.addEventListener('click', async () => {
   const proj = projects.find(p => p.id === currentProjectId);
   const name = proj ? proj.name : currentProjectId;
   if (!confirm(`Delete project "${name}" and all its indexed documents? This cannot be undone.`)) return;
-  const r = await fetch(`/api/projects/${currentProjectId}`, { method: 'DELETE' });
+  const r = await fetch(`/api/ally/projects/${currentProjectId}`, { method: 'DELETE' });
   const d = await r.json();
   if (d.error) { alert(d.error); return; }
   delete conversationHistories[currentProjectId];
@@ -990,7 +993,7 @@ reindexBtn.addEventListener('click', async () => {
   reindexBtn.disabled = true;
   setStatus('Re-indexing started…');
   try {
-    const r = await fetch(`/api/projects/${currentProjectId}/reindex`, { method: 'POST' });
+    const r = await fetch(`/api/ally/projects/${currentProjectId}/reindex`, { method: 'POST' });
     const d = await r.json();
     setStatus(d.message || 'Re-indexing started.');
     setTimeout(async () => {
@@ -1023,7 +1026,27 @@ userInput.addEventListener('input', () => {
 });
 
 // ── Settings ──────────────────────────────────────────────────────────────────
-settingsBtn.addEventListener('click', async () => {
+let settingsMode = 'project'; // 'default' or 'project'
+
+async function openSettings(mode) {
+  settingsMode = mode;
+  const projSection = document.getElementById('project-settings-section');
+  const globalHeader = document.getElementById('global-settings-header');
+  const globalFields = document.getElementById('global-settings-fields');
+  const title = document.getElementById('settings-title');
+
+  if (mode === 'default') {
+    title.textContent = 'Default Settings';
+    globalHeader.textContent = 'Global Defaults';
+    globalFields.style.display = 'block';
+    projSection.hidden = true;
+  } else {
+    title.textContent = 'Project Settings';
+    globalHeader.textContent = 'Global Defaults (reference)';
+    globalFields.style.display = 'block';
+    projSection.hidden = !currentProjectId;
+  }
+
   const r = await fetch('/api/ally/settings');
   const d = await r.json();
   document.getElementById('s-api-key').value = '';
@@ -1038,13 +1061,10 @@ settingsBtn.addEventListener('click', async () => {
   document.getElementById('s-topk').value = d.top_k_results || '';
   document.getElementById('s-system').value = d.system_prompt || '';
 
-  // Project overrides section
-  const projSection = document.getElementById('project-settings-section');
-  if (currentProjectId) {
+  if (mode === 'project' && currentProjectId) {
     const proj = projects.find(p => p.id === currentProjectId);
     document.getElementById('project-settings-name').textContent =
       `Project: ${proj ? proj.name : currentProjectId}`;
-    projSection.hidden = false;
 
     const pr = await fetch(`/api/ally/projects/${currentProjectId}/settings`);
     const pd = await pr.json();
@@ -1060,18 +1080,19 @@ settingsBtn.addEventListener('click', async () => {
     document.getElementById('ps-system').value = ov.system_prompt || '';
     document.getElementById('ps-system-hint').textContent =
       ov.system_prompt ? 'Currently overriding global.' : 'Currently using global default.';
-  } else {
-    projSection.hidden = true;
   }
 
   settingsDialog.showModal();
   document.getElementById('s-api-key').focus();
-});
+}
+
+defaultSettingsBtn.addEventListener('click', () => openSettings('default'));
+settingsBtn.addEventListener('click', () => openSettings('project'));
 
 document.getElementById('settings-cancel-btn').addEventListener('click', () => settingsDialog.close());
 
 document.getElementById('settings-save-btn').addEventListener('click', async () => {
-  // Save global settings
+  // Always save global settings
   const payload = {
     openrouter_model:   document.getElementById('s-model').value,
     ollama_base_url:    document.getElementById('s-ollama-url').value,
@@ -1092,8 +1113,8 @@ document.getElementById('settings-save-btn').addEventListener('click', async () 
   const d = await r.json();
   if (d.error) { alert(d.error); return; }
 
-  // Save project overrides if a project is selected
-  if (currentProjectId && !document.getElementById('project-settings-section').hidden) {
+  // Save project overrides only if in project mode and a project is selected
+  if (settingsMode === 'project' && currentProjectId && !document.getElementById('project-settings-section').hidden) {
     const projPayload = {
       openrouter_model: document.getElementById('ps-model').value.trim() || null,
       top_k_results:    document.getElementById('ps-topk').value.trim() || null,
