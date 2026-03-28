@@ -41,7 +41,7 @@ PROJECTS_DIR.mkdir(exist_ok=True)
 DEFAULT_CONFIG = {
     "openrouter_api_key": "",
     "openrouter_model": "openai/gpt-4o-mini",
-    "ollama_base_url": "http://localhost:11434", # Default for Ollama running in WSL
+    "ollama_base_url": "http://localhost:11435", # Default for Ollama running in WSL
     "ollama_embed_model": "nomic-embed-text",
     "chunk_size": 500,
     "chunk_overlap": 50,
@@ -57,7 +57,8 @@ DEFAULT_CONFIG = {
 DEFAULT_CONFIG = {
     "openrouter_api_key": "",
     "openrouter_model": "openai/gpt-4o-mini",
-    "ollama_base_url": "http://localhost:11434", # Default for Ollama running in WSL
+    # "ollama_base_url": "http://localhost:11434", # Default for Ollama running in WSL
+    "ollama_base_url": "http://localhost:11435", # Default for Ollama running in WSL
     "ollama_embed_model": "nomic-embed-text",
     "chunk_size": 500,
     "chunk_overlap": 50,
