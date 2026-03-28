@@ -1,22 +1,27 @@
 """
-rag_chat.py — Multi-project RAG chat using Ollama embeddings + OpenRouter LLM.
+ally.py — Multi-project RAG chat using Ollama embeddings + OpenRouter LLM.
 
 Requirements:
-    pip install flask chromadb requests watchdog
+    pip install flask chromadb requests watchdog python-dotenv
 
 Usage:
-    1. Run: python rag_chat.py
+    1. Run: python ally.py
     2. Open http://localhost:5000 in your browser.
     3. Create projects and manage everything from the UI.
 """
 
 import json
+import os
 import shutil
 import hashlib
 import logging
 import threading
 from pathlib import Path
 from datetime import datetime
+
+from dotenv import load_dotenv
+
+load_dotenv()
 
 import requests
 from flask import Flask, request, jsonify, send_from_directory
@@ -41,25 +46,8 @@ PROJECTS_DIR.mkdir(exist_ok=True)
 DEFAULT_CONFIG = {
     "openrouter_api_key": "",
     "openrouter_model": "openai/gpt-4o-mini",
-    "ollama_base_url": "http://localhost:11435", # Default for Ollama running in WSL
-    "ollama_embed_model": "nomic-embed-text",
-    "chunk_size": 500,
-    "chunk_overlap": 50,
-    "top_k_results": 5,
-    "system_prompt": (
-        "You are a helpful assistant. Answer questions using the provided context. "
-        "If the context doesn't contain relevant information, say so and answer "
-        "from your general knowledge."
-    )
-}
-
-# ── Config ────────────────────────────────────────────────────────────────────
-DEFAULT_CONFIG = {
-    "openrouter_api_key": "",
-    "openrouter_model": "openai/gpt-4o-mini",
-    # "ollama_base_url": "http://localhost:11434", # Default for Ollama running in WSL
-    "ollama_base_url": "http://localhost:11435", # Default for Ollama running in WSL
-    "ollama_embed_model": "nomic-embed-text",
+    "ollama_base_url": os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11435"),
+    "ollama_embed_model": os.getenv("OLLAMA_EMBED_MODEL", "nomic-embed-text"),
     "chunk_size": 500,
     "chunk_overlap": 50,
     "top_k_results": 5,
