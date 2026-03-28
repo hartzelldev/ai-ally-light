@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>RAG Chat</title>
+  <title>AI Ally Light</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -436,7 +436,7 @@
 <a href="#user-input" class="skip-link">Skip to message input</a>
 
 <header>
-  <h1>RAG Chat</h1>
+  <h1>AI Ally Light</h1>
   <span id="system-status" role="status" aria-live="polite">Checking…</span>
 </header>
 
@@ -450,7 +450,7 @@
     </ul>
     <div id="new-project-area">
       <label for="new-project-name" class="sr-only">New project name</label>
-      <input type="text" id="new-project-name" placeholder="New project name…" autocomplete="off" />
+      <input type="text" id="new-project-name" placeholder="AI Ally Light project name…" autocomplete="off" />
       <button id="create-project-btn" aria-label="Create new project">Create Project</button>
     </div>
   </nav>
@@ -460,7 +460,7 @@
 
     <!-- No project selected -->
     <div id="no-project-msg" role="status">
-      Create or select a project to begin.
+      Create or select an AI Ally Light project to begin.
     </div>
 
     <!-- Chat area (hidden until project selected) -->
@@ -470,7 +470,7 @@
         <span id="current-project-name" aria-live="polite"></span>
         <button id="rename-project-btn" class="secondary" aria-label="Rename current project">Rename</button>
         <button id="reindex-btn" class="secondary" aria-label="Re-index documents for current project">Re-index</button>
-        <button id="settings-btn" class="secondary" aria-label="Open settings">Settings</button>
+        <button id="settings-btn" class="secondary" aria-label="Open AI Ally Light settings">Settings</button>
         <button id="delete-project-btn" class="danger" aria-label="Delete current project">Delete</button>
       </div>
 
@@ -482,7 +482,7 @@
         <label for="user-input" class="sr-only">Your message</label>
         <textarea
           id="user-input"
-          placeholder="Ask a question… (Enter to send, Shift+Enter for new line)"
+          placeholder="Ask AI Ally Light a question… (Enter to send, Shift+Enter for new line)"
           rows="2"
           aria-describedby="input-hint"
         ></textarea>
@@ -521,7 +521,7 @@
 
 <!-- Settings dialog -->
 <dialog id="settings-dialog" aria-labelledby="settings-title">
-  <h2 id="settings-title">Settings</h2>
+  <h2 id="settings-title">AI Ally Light Settings</h2>
 
   <h3 style="font-size:0.85rem;font-weight:normal;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:0.75rem;">Global Defaults</h3>
 
@@ -660,7 +660,7 @@ function setInputDisabled(v) {
 // ── System status ─────────────────────────────────────────────────────────────
 async function loadSystemStatus() {
   try {
-    const r = await fetch('/api/status');
+    const r = await fetch('/api/ally/status');
     const d = await r.json();
     modelInfo.textContent = 'LLM: ' + d.model;
     embedInfo.textContent = 'Embed: ' + d.embed_model;
@@ -683,7 +683,7 @@ async function loadSystemStatus() {
 
 // ── Project list ──────────────────────────────────────────────────────────────
 async function loadProjects() {
-  const r = await fetch('/api/projects');
+  const r = await fetch('/api/ally/projects');
   projects = await r.json();
   renderProjectList();
 }
@@ -731,7 +731,7 @@ async function selectProject(pid) {
 async function loadProjectStatus(pid) {
   if (!pid) return;
   try {
-    const r = await fetch(`/api/projects/${pid}/status`);
+    const r = await fetch(`/api/ally/projects/${pid}/status`);
     const d = await r.json();
 
     chunkCount.textContent = `${d.chunk_count} chunk${d.chunk_count !== 1 ? 's' : ''} indexed`;
@@ -760,7 +760,7 @@ async function loadProjectStatus(pid) {
     const logList = document.getElementById('log-files');
     logList.innerHTML = '';
     try {
-      const lr = await fetch(`/api/projects/${pid}/logs`);
+      const lr = await fetch(`/api/ally/projects/${pid}/logs`);
       const logs = await lr.json();
       if (!logs.length) {
         const li = document.createElement('li');
@@ -879,7 +879,7 @@ async function sendMessage() {
   const thinkingEl = addThinking();
 
   try {
-    const r = await fetch(`/api/projects/${currentProjectId}/chat`, {
+    const r = await fetch(`/api/ally/projects/${currentProjectId}/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -920,7 +920,7 @@ createProjectBtn.addEventListener('click', async () => {
   if (!name) { newProjectName.focus(); return; }
   createProjectBtn.disabled = true;
   try {
-    const r = await fetch('/api/projects', {
+    const r = await fetch('/api/ally/projects', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name })
@@ -953,7 +953,7 @@ document.getElementById('rename-cancel-btn').addEventListener('click', () => ren
 document.getElementById('rename-save-btn').addEventListener('click', async () => {
   const name = document.getElementById('rename-input').value.trim();
   if (!name) return;
-  const r = await fetch(`/api/projects/${currentProjectId}`, {
+  const r = await fetch(`/api/ally/projects/${currentProjectId}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name })
@@ -1024,7 +1024,7 @@ userInput.addEventListener('input', () => {
 
 // ── Settings ──────────────────────────────────────────────────────────────────
 settingsBtn.addEventListener('click', async () => {
-  const r = await fetch('/api/settings');
+  const r = await fetch('/api/ally/settings');
   const d = await r.json();
   document.getElementById('s-api-key').value = '';
   document.getElementById('s-key-masked').textContent = d.openrouter_api_key_masked
@@ -1046,7 +1046,7 @@ settingsBtn.addEventListener('click', async () => {
       `Project: ${proj ? proj.name : currentProjectId}`;
     projSection.hidden = false;
 
-    const pr = await fetch(`/api/projects/${currentProjectId}/settings`);
+    const pr = await fetch(`/api/ally/projects/${currentProjectId}/settings`);
     const pd = await pr.json();
     const ov = pd.overrides || {};
     const gl = pd.global || {};
@@ -1084,7 +1084,7 @@ document.getElementById('settings-save-btn').addEventListener('click', async () 
   const key = document.getElementById('s-api-key').value.trim();
   if (key) payload.openrouter_api_key = key;
 
-  const r = await fetch('/api/settings', {
+  const r = await fetch('/api/ally/settings', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
@@ -1099,7 +1099,7 @@ document.getElementById('settings-save-btn').addEventListener('click', async () 
       top_k_results:    document.getElementById('ps-topk').value.trim() || null,
       system_prompt:    document.getElementById('ps-system').value.trim() || null,
     };
-    await fetch(`/api/projects/${currentProjectId}/settings`, {
+    await fetch(`/api/ally/projects/${currentProjectId}/settings`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(projPayload)
