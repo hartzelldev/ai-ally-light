@@ -39,6 +39,7 @@ secrets.json
 .aider*
 config.json
 .opencode/
+.opencode.json
 
 # App specific
 projects/
