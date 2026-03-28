@@ -643,6 +643,6 @@ if __name__ == "__main__":
     target_port = find_free_port(5001, 5020) or 5000
     threading.Thread(target=startup, args=(target_port,), daemon=True).start()
     
-    log.info(f"RAG Chat running at http://localhost:{target_port}")
+    log.info(f"AI Ally Light running at http://localhost:{target_port}")
     app.run(host="127.0.0.1", port=target_port, debug=False)
     

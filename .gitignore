@@ -13,8 +13,8 @@ build/
 dist/
 
 # Virtual environment
-.venv/ # common alternative
-env/ # common alternative
+.venv/ 
+env/ 
 
 # PyInstaller
 *.manifest
@@ -37,6 +37,7 @@ tmp/
 config.ini
 secrets.json
 .aider*
+config.json
 
 # App specific
 projects/
