@@ -38,6 +38,7 @@ config.ini
 secrets.json
 .aider*
 config.json
+.opencode/
 
 # App specific
 projects/
