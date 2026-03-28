@@ -41,7 +41,23 @@ PROJECTS_DIR.mkdir(exist_ok=True)
 DEFAULT_CONFIG = {
     "openrouter_api_key": "",
     "openrouter_model": "openai/gpt-4o-mini",
-    "ollama_base_url": "http://localhost:11434",
+    "ollama_base_url": "http://localhost:11434", # Default for Ollama running in WSL
+    "ollama_embed_model": "nomic-embed-text",
+    "chunk_size": 500,
+    "chunk_overlap": 50,
+    "top_k_results": 5,
+    "system_prompt": (
+        "You are a helpful assistant. Answer questions using the provided context. "
+        "If the context doesn't contain relevant information, say so and answer "
+        "from your general knowledge."
+    )
+}
+
+# ── Config ────────────────────────────────────────────────────────────────────
+DEFAULT_CONFIG = {
+    "openrouter_api_key": "",
+    "openrouter_model": "openai/gpt-4o-mini",
+    "ollama_base_url": "http://localhost:11434", # Default for Ollama running in WSL
     "ollama_embed_model": "nomic-embed-text",
     "chunk_size": 500,
     "chunk_overlap": 50,
@@ -58,6 +74,7 @@ def load_config() -> dict:
         CONFIG_FILE.write_text(json.dumps(DEFAULT_CONFIG, indent=2))
     with open(CONFIG_FILE) as f:
         cfg = json.load(f)
+    # Ensure all default keys are present, even if not in the file
     for k, v in DEFAULT_CONFIG.items():
         cfg.setdefault(k, v)
     return cfg
