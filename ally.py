@@ -360,7 +360,7 @@ def index_file(pid: str, path: Path):
             "filename": path.name,
             "title": document_title,
             "chunk": i,
-            "section": chunk.get("section"),
+            "section": chunk.get("section") or "",
             "section_level": chunk.get("section_level", 0),
             "position": position,
             "indexed_at": datetime.now().isoformat()
