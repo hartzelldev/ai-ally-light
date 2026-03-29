@@ -9,6 +9,8 @@
 - **Enhanced Chunking**: Sentence-aware chunking preserves complete sentences
 - **Rich Document Metadata**: Each chunk tagged with title, section, and position
 - **Screen Reader Optimized Sources**: Sources display includes document title, section, and position with ARIA labels
+- **File Upload**: Upload documents (.txt, .md) directly from browser
+- **File Management**: Select and delete/reindex individual files from the index
 
 ### Technical
 - `/api/ally/` API prefix for all endpoints
@@ -17,6 +19,7 @@
 - Sentence-aware text chunking (regex-based)
 - Markdown heading extraction for section tagging
 - Chunk position metadata: "beginning", "middle", "end", or "full"
+- Upload and file management API endpoints
 
 ---
 

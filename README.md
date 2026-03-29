@@ -24,7 +24,7 @@ An accessible, light-weight, local multi-project RAG chat system.
 ### 1. Install Python dependencies
 
 ```
-pip install flask chromadb requests watchdog python-dotenv
+pip install flask chromadb requests watchdog python-dotenv werkzeug
 ```
 
 ### 2. Pull the embedding model
@@ -75,11 +75,16 @@ Everything else can be left at defaults to start.
 - Use Rename, Delete, and Re-index buttons in the project action bar.
 
 ### Adding documents
-Each project has its own docs folder. The folder path is shown in the right panel
-after you select a project. Drop .txt or .md files there — the app watches the
-folder and indexes new files automatically.
+Select a project, then click **Upload Documents** in the right panel to upload
+.txt or .md files directly from your browser.
 
-To manually trigger a full re-index (e.g. after adding many files), click Re-index.
+Alternatively, you can manually add files to the project's docs folder. The app
+watches the folder and indexes new files automatically.
+
+### Managing indexed files
+The right panel shows all indexed files with chunk counts. Use the checkboxes to:
+- **Delete Selected** — remove files from the index (keeps the original files)
+- **Reindex Selected** — re-process selected files (useful after editing)
 
 ### Chatting
 - Type in the message box and press Enter to send.
