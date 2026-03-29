@@ -190,20 +190,123 @@ def check_ollama() -> tuple:
         return False, f"Cannot reach Ollama at {config['ollama_base_url']}. Is it running?"
 
 # ── Chunking ──────────────────────────────────────────────────────────────────
-def chunk_text(text: str) -> list:
-    size, overlap = config["chunk_size"], config["chunk_overlap"]
-    words = text.split()
-    if not words:
-        return []
-    chunks, start = [], 0
-    while start < len(words):
-        end = min(start + size, len(words))
-        chunk = " ".join(words[start:end])
-        if chunk.strip():
-            chunks.append(chunk)
-        if end == len(words):
+import re
+
+def split_into_sentences(text: str) -> list:
+    """Split text into sentences, preserving the sentence-ending punctuation."""
+    sentence_pattern = r'[^.!?…\n]+(?:[.!?…]+\s*|\n+)(?=\s|$)?|[^.!?…\n]+$'
+    sentences = re.findall(sentence_pattern, text, re.UNICODE)
+    return [s.strip() for s in sentences if s.strip()]
+
+def extract_title(text: str, filename: str) -> str:
+    """Extract title from markdown file (first H1) or use filename."""
+    h1_match = re.search(r'^#\s+(.+)$', text, re.MULTILINE)
+    if h1_match:
+        return h1_match.group(1).strip()
+    first_line = text.split('\n')[0].strip()
+    if first_line and len(first_line) <= 100:
+        return first_line
+    return filename
+
+def extract_sections(text: str) -> list:
+    """Extract headings and their starting positions. Returns list of (position, level, title)."""
+    sections = []
+    for match in re.finditer(r'^(#{1,6})\s+(.+)$', text, re.MULTILINE):
+        level = len(match.group(1))
+        title = match.group(2).strip()
+        sections.append((match.start(), level, title))
+    return sections
+
+def get_section_at_position(sections: list, position: int) -> tuple:
+    """Given sections and a character position, return (section_title, level).
+    Returns (None, 0) if no section found."""
+    if not sections:
+        return None, 0
+    current_section = None
+    current_level = 0
+    for sec_pos, sec_level, sec_title in sections:
+        if sec_pos <= position:
+            current_section = sec_title
+            current_level = sec_level
+        else:
             break
-        start += size - overlap
+    return current_section, current_level
+
+def get_chunk_position(total_chunks: int, chunk_index: int) -> str:
+    """Return 'beginning', 'middle', or 'end' based on chunk position."""
+    if total_chunks <= 2:
+        return "full"
+    ratio = chunk_index / total_chunks
+    if ratio < 0.25:
+        return "beginning"
+    elif ratio > 0.75:
+        return "end"
+    return "middle"
+
+def chunk_text(text: str, path: Path = None) -> list:
+    """
+    Split text into chunks using sentences.
+    Each chunk is a dict with: text, start_pos, end_pos
+    """
+    size, overlap = config["chunk_size"], config["chunk_overlap"]
+    
+    if path and path.suffix.lower() == '.md':
+        sections = extract_sections(text)
+    else:
+        sections = []
+    
+    sentences = split_into_sentences(text)
+    if not sentences:
+        return []
+    
+    chunks = []
+    current_words = []
+    current_text = ""
+    chunk_start = 0
+    
+    for sentence in sentences:
+        sentence_words = sentence.split()
+        sentence_len = len(sentence_words)
+        
+        if not current_words:
+            chunk_start = text.find(sentence)
+            if chunk_start == -1:
+                chunk_start = 0
+        
+        current_words.extend(sentence_words)
+        current_text = " ".join(current_words)
+        
+        if len(current_words) >= size:
+            end_pos = chunk_start + len(current_text)
+            section, level = get_section_at_position(sections, chunk_start)
+            chunks.append({
+                "text": current_text,
+                "start_pos": chunk_start,
+                "end_pos": end_pos,
+                "section": section,
+                "section_level": level
+            })
+            
+            tail_words = current_words[-overlap:] if overlap > 0 else []
+            current_words = list(tail_words)
+            current_text = " ".join(current_words)
+            
+            if tail_words:
+                chunk_start = text.find(" ".join(tail_words), chunk_start + 1)
+            else:
+                chunk_start = end_pos
+    
+    if current_words:
+        end_pos = chunk_start + len(current_text)
+        section, level = get_section_at_position(sections, chunk_start)
+        chunks.append({
+            "text": current_text,
+            "start_pos": chunk_start,
+            "end_pos": end_pos,
+            "section": section,
+            "section_level": level
+        })
+    
     return chunks
 
 def file_hash(path: Path) -> str:
@@ -235,30 +338,37 @@ def index_file(pid: str, path: Path):
     except Exception:
         pass
 
-    chunks = chunk_text(text)
+    chunks = chunk_text(text, path)
     if not chunks:
         return
 
+    document_title = extract_title(text, path.name)
+    total_chunks = len(chunks)
     ids, embeddings, documents, metadatas = [], [], [], []
     for i, chunk in enumerate(chunks):
         try:
-            emb = get_embedding(chunk)
+            emb = get_embedding(chunk["text"])
         except Exception as e:
             log.error(f"[{pid}] Embedding error: {e}")
             return
+        position = get_chunk_position(total_chunks, i)
         ids.append(f"{fhash}_{i}")
         embeddings.append(emb)
-        documents.append(chunk)
+        documents.append(chunk["text"])
         metadatas.append({
             "source": str_path,
             "filename": path.name,
+            "title": document_title,
             "chunk": i,
+            "section": chunk.get("section"),
+            "section_level": chunk.get("section_level", 0),
+            "position": position,
             "indexed_at": datetime.now().isoformat()
         })
 
     col.add(ids=ids, embeddings=embeddings, documents=documents, metadatas=metadatas)
     proj_hashes[str_path] = fhash
-    log.info(f"[{pid}] Indexed {path.name} — {len(chunks)} chunks.")
+    log.info(f"[{pid}] Indexed {path.name} ({document_title}) — {len(chunks)} chunks.")
 
 def index_project(pid: str):
     docs_dir = project_docs_dir(pid)
@@ -350,6 +460,10 @@ def retrieve(pid: str, query: str, cfg: dict = None) -> list:
         {
             "text": doc,
             "filename": meta.get("filename", "unknown"),
+            "title": meta.get("title", meta.get("filename", "unknown")),
+            "section": meta.get("section"),
+            "section_level": meta.get("section_level", 0),
+            "position": meta.get("position", "unknown"),
             "score": round(1 - dist, 4)
         }
         for doc, meta, dist in zip(

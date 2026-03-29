@@ -6,11 +6,17 @@
 - **Environment Variable Configuration**: Ollama URL and model loaded from `.env` file via python-dotenv
 - **Separated Settings UI**: Default Settings (header button) and Project Settings clearly distinguished
 - **WSL Compatibility**: Default Ollama URL uses `127.0.0.1` instead of `localhost`
+- **Enhanced Chunking**: Sentence-aware chunking preserves complete sentences
+- **Rich Document Metadata**: Each chunk tagged with title, section, and position
+- **Screen Reader Optimized Sources**: Sources display includes document title, section, and position with ARIA labels
 
 ### Technical
 - `/api/ally/` API prefix for all endpoints
 - Default Ollama URL: `http://127.0.0.1:11435`
 - Default embedding model: `nomic-embed-text`
+- Sentence-aware text chunking (regex-based)
+- Markdown heading extraction for section tagging
+- Chunk position metadata: "beginning", "middle", "end", or "full"
 
 ---
 

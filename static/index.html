@@ -835,9 +835,16 @@ function addMessageEl(role, content, sources) {
     summary.textContent = `Sources (${sources.length})`;
     details.appendChild(summary);
     const ul = document.createElement('ul');
-    sources.forEach(s => {
+    sources.forEach((s, idx) => {
       const li = document.createElement('li');
-      li.textContent = `${s.filename} `;
+      
+      const title = s.title || s.filename;
+      const section = s.section ? ` in "${s.section}"` : '';
+      const position = s.position && s.position !== 'full' ? ` (${s.position})` : '';
+      const ariaLabel = `Source ${idx + 1}: ${title}${section}${position}, ${(s.score * 100).toFixed(1)}% match`;
+      
+      li.setAttribute('aria-label', ariaLabel);
+      li.textContent = `${title}${section}${position} `;
       const score = document.createElement('span');
       score.className = 'score';
       score.textContent = `(${(s.score * 100).toFixed(1)}% match)`;
