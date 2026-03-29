@@ -25,6 +25,7 @@ load_dotenv()
 
 import requests
 from flask import Flask, request, jsonify, send_from_directory
+from werkzeug.utils import secure_filename
 import chromadb
 from chromadb.config import Settings
 from watchdog.observers import Observer
@@ -384,11 +385,44 @@ def index_project(pid: str):
 def get_project_index_status(pid: str) -> dict:
     col = get_collection(pid)
     count = col.count()
-    files = sorted(set(
-        m["filename"]
-        for m in (col.get(include=["metadatas"])["metadatas"] or [])
-    ))
-    return {"chunk_count": count, "indexed_files": files}
+    
+    files_with_chunks = {}
+    for m in (col.get(include=["metadatas"])["metadatas"] or []):
+        fname = m.get("filename", "unknown")
+        if fname not in files_with_chunks:
+            files_with_chunks[fname] = 0
+        files_with_chunks[fname] += 1
+    
+    filenames = sorted(files_with_chunks.keys())
+    indexed_files = [
+        {"filename": fname, "chunk_count": files_with_chunks[fname]}
+        for fname in filenames
+    ]
+    
+    return {"chunk_count": count, "indexed_files": indexed_files}
+
+def delete_file_from_index(pid: str, filename: str):
+    """Remove a file's chunks from the index."""
+    col = get_collection(pid)
+    try:
+        existing = col.get(where={"filename": filename})
+        if existing["ids"]:
+            col.delete(ids=existing["ids"])
+            log.info(f"[{pid}] Removed '{filename}' from index.")
+            return True
+    except Exception as e:
+        log.error(f"[{pid}] Error removing '{filename}': {e}")
+    return False
+
+def reindex_file(pid: str, filename: str):
+    """Re-index a single file."""
+    docs_dir = project_docs_dir(pid)
+    filepath = docs_dir / filename
+    if filepath.exists():
+        indexed_hashes.get(pid, {}).pop(str(filepath), None)
+        index_file(pid, filepath)
+        return True
+    return False
 
 # ── File Watcher ──────────────────────────────────────────────────────────────
 watchers: dict = {}
@@ -633,6 +667,40 @@ def api_create_project():
     log.info(f"Created project '{name}' ({pid})")
     return jsonify({"id": pid, "name": name, "docs_folder": str(project_docs_dir(pid))})
 
+ALLOWED_EXTENSIONS = {'.txt', '.md'}
+
+@app.route("/api/ally/projects/<pid>/upload", methods=["POST"])
+def api_upload_document(pid):
+    if pid not in load_projects():
+        return jsonify({"error": "Project not found."}), 404
+    
+    if 'file' not in request.files:
+        return jsonify({"error": "No file provided."}), 400
+    
+    file = request.files['file']
+    original_filename = file.filename or ''
+    if not original_filename:
+        return jsonify({"error": "No file selected."}), 400
+    
+    filename = secure_filename(original_filename)
+    if not filename:
+        return jsonify({"error": "Invalid filename."}), 400
+    ext = Path(filename).suffix.lower()
+    
+    if ext not in ALLOWED_EXTENSIONS:
+        return jsonify({"error": f"File type {ext} not allowed. Use .txt or .md"}), 400
+    
+    docs_dir = project_docs_dir(pid)
+    filepath = docs_dir / filename
+    
+    try:
+        file.save(str(filepath))
+        log.info(f"[{pid}] Uploaded {filename}")
+        return jsonify({"success": True, "filename": filename})
+    except Exception as e:
+        log.error(f"[{pid}] Upload error: {e}")
+        return jsonify({"error": str(e)}), 500
+
 # Rename project
 @app.route("/api/ally/projects/<pid>", methods=["PUT"])
 def api_rename_project(pid):
@@ -668,6 +736,36 @@ def api_project_status(pid):
     if pid not in load_projects():
         return jsonify({"error": "Project not found."}), 404
     return jsonify(get_project_index_status(pid))
+
+# Delete file from index
+@app.route("/api/ally/projects/<pid>/files", methods=["DELETE"])
+def api_delete_files(pid):
+    if pid not in load_projects():
+        return jsonify({"error": "Project not found."}), 404
+    data = request.json or {}
+    filenames = data.get("filenames", [])
+    if not filenames:
+        return jsonify({"error": "No filenames provided."}), 400
+    deleted = []
+    for fname in filenames:
+        if delete_file_from_index(pid, fname):
+            deleted.append(fname)
+    return jsonify({"success": True, "deleted": deleted})
+
+# Re-index files
+@app.route("/api/ally/projects/<pid>/files/reindex", methods=["POST"])
+def api_reindex_files(pid):
+    if pid not in load_projects():
+        return jsonify({"error": "Project not found."}), 404
+    data = request.json or {}
+    filenames = data.get("filenames", [])
+    if not filenames:
+        return jsonify({"error": "No filenames provided."}), 400
+    reindexed = []
+    for fname in filenames:
+        if reindex_file(pid, fname):
+            reindexed.append(fname)
+    return jsonify({"success": True, "reindexed": reindexed})
 
 # Re-index project
 @app.route("/api/ally/projects/<pid>/reindex", methods=["POST"])

@@ -498,13 +498,20 @@
   <!-- Right info panel -->
   <aside id="info-panel" aria-label="Index information">
     <div class="panel-section">
-      <h2>Indexed Files</h2>
-      <p id="chunk-count" aria-live="polite">—</p>
-      <ul id="indexed-files" aria-label="Indexed files"></ul>
+      <h2>Documents</h2>
+      <p style="font-size:0.78rem;color:var(--text-dim);margin-bottom:0.5rem;">Supported: .txt, .md</p>
+      <input type="file" id="file-upload" accept=".txt,.md" multiple style="display:none;" />
+      <button id="upload-btn" class="secondary" aria-label="Upload documents to this project">Upload Documents</button>
+      <p id="upload-status" aria-live="polite" style="font-size:0.78rem;margin-top:0.5rem;"></p>
     </div>
     <div class="panel-section">
-      <h2>Docs Folder</h2>
-      <p id="docs-path" aria-label="Documents folder path">Select a project.</p>
+      <h2>Indexed Files</h2>
+      <p id="chunk-count" aria-live="polite" style="font-size:0.78rem;color:var(--text-dim);">—</p>
+      <div id="file-actions" style="display:none;margin-bottom:0.5rem;">
+        <button id="delete-files-btn" class="danger" style="font-size:0.8rem;padding:0.3rem 0.5rem;">Delete Selected</button>
+        <button id="reindex-files-btn" class="secondary" style="font-size:0.8rem;padding:0.3rem 0.5rem;">Reindex Selected</button>
+      </div>
+      <ul id="indexed-files" aria-label="Indexed files" style="list-style:none;padding:0;"></ul>
     </div>
     <div class="panel-section">
       <h2>Model</h2>
@@ -642,7 +649,6 @@ const clearBtn         = document.getElementById('clear-btn');
 const systemStatus     = document.getElementById('system-status');
 const chunkCount       = document.getElementById('chunk-count');
 const indexedFiles     = document.getElementById('indexed-files');
-const docsPath         = document.getElementById('docs-path');
 const modelInfo        = document.getElementById('model-info');
 const embedInfo        = document.getElementById('embed-info');
 
@@ -739,22 +745,43 @@ async function loadProjectStatus(pid) {
 
     chunkCount.textContent = `${d.chunk_count} chunk${d.chunk_count !== 1 ? 's' : ''} indexed`;
 
+    const fileActions = document.getElementById('file-actions');
     indexedFiles.innerHTML = '';
+    
     if (!d.indexed_files || d.indexed_files.length === 0) {
       const li = document.createElement('li');
+      li.style.fontSize = '0.78rem';
+      li.style.color = 'var(--text-dim)';
       li.textContent = 'No files indexed.';
       indexedFiles.appendChild(li);
+      fileActions.style.display = 'none';
     } else {
+      fileActions.style.display = 'block';
       for (const f of d.indexed_files) {
         const li = document.createElement('li');
-        li.textContent = f;
-        li.title = f;
+        li.style.marginBottom = '0.35rem';
+        li.style.display = 'flex';
+        li.style.alignItems = 'center';
+        li.style.gap = '0.4rem';
+        
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.id = `file-${f.filename}`;
+        checkbox.value = f.filename;
+        checkbox.style.margin = '0';
+        
+        const label = document.createElement('label');
+        label.htmlFor = `file-${f.filename}`;
+        label.style.fontSize = '0.82rem';
+        label.style.cursor = 'pointer';
+        label.style.flex = '1';
+        label.textContent = `${f.filename} (${f.chunk_count} chunks)`;
+        
+        li.appendChild(checkbox);
+        li.appendChild(label);
         indexedFiles.appendChild(li);
       }
     }
-
-    const proj = projects.find(p => p.id === pid);
-    docsPath.textContent = proj ? proj.docs_folder : '—';
 
     // Session info
     document.getElementById('session-id-display').textContent = 'Today: ' + currentSessionId;
@@ -785,6 +812,57 @@ async function loadProjectStatus(pid) {
     } catch { /* ignore log fetch errors */ }
 
   } catch { /* ignore */ }
+}
+
+function getSelectedFiles() {
+  const checkboxes = indexedFiles.querySelectorAll('input[type="checkbox"]');
+  return Array.from(checkboxes)
+    .filter(cb => cb.checked)
+    .map(cb => cb.value);
+}
+
+async function deleteSelectedFiles() {
+  const selected = getSelectedFiles();
+  if (!selected.length) return;
+  
+  if (!confirm(`Delete ${selected.length} file(s) from the index? The files will remain in the docs folder.`)) return;
+  
+  try {
+    const r = await fetch(`/api/ally/projects/${currentProjectId}/files`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filenames: selected })
+    });
+    
+    if (r.ok) {
+      setStatus(`Deleted ${selected.length} file(s) from index.`);
+      loadProjectStatus(currentProjectId);
+    }
+  } catch {
+    setStatus('Failed to delete files.');
+  }
+}
+
+async function reindexSelectedFiles() {
+  const selected = getSelectedFiles();
+  if (!selected.length) return;
+  
+  setStatus(`Re-indexing ${selected.length} file(s)…`);
+  
+  try {
+    const r = await fetch(`/api/ally/projects/${currentProjectId}/files/reindex`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filenames: selected })
+    });
+    
+    if (r.ok) {
+      setStatus(`Re-indexed ${selected.length} file(s).`);
+      loadProjectStatus(currentProjectId);
+    }
+  } catch {
+    setStatus('Failed to reindex files.');
+  }
 }
 
 // ── Messages ──────────────────────────────────────────────────────────────────
@@ -991,7 +1069,7 @@ deleteBtn.addEventListener('click', async () => {
   await loadProjects();
   chunkCount.textContent = '—';
   indexedFiles.innerHTML = '';
-  docsPath.textContent = 'Select a project.';
+  document.getElementById('file-actions').style.display = 'none';
 });
 
 // ── Re-index ──────────────────────────────────────────────────────────────────
@@ -1021,6 +1099,72 @@ clearBtn.addEventListener('click', () => {
   renderMessages(currentProjectId);
   userInput.focus();
 });
+
+// ── File upload ──────────────────────────────────────────────────────────────
+const uploadBtn = document.getElementById('upload-btn');
+const fileInput = document.getElementById('file-upload');
+const uploadStatus = document.getElementById('upload-status');
+
+uploadBtn.addEventListener('click', () => {
+  if (!currentProjectId) {
+    uploadStatus.textContent = 'Select a project first.';
+    return;
+  }
+  fileInput.click();
+});
+
+fileInput.addEventListener('change', async () => {
+  if (!fileInput.files.length) return;
+  
+  const files = Array.from(fileInput.files);
+  uploadBtn.disabled = true;
+  uploadStatus.textContent = `Uploading ${files.length} file(s)…`;
+  
+  let successCount = 0;
+  let failCount = 0;
+  
+  for (const file of files) {
+    if (!currentProjectId) break;
+    
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const r = await fetch(`/api/ally/projects/${currentProjectId}/upload`, {
+        method: 'POST',
+        body: formData
+      });
+      
+      if (r.ok) {
+        successCount++;
+      } else {
+        failCount++;
+      }
+    } catch {
+      failCount++;
+    }
+  }
+  
+  fileInput.value = '';
+  uploadBtn.disabled = false;
+  
+  if (successCount > 0) {
+    uploadStatus.textContent = `${successCount} file(s) uploaded. Indexing…`;
+    setTimeout(() => {
+      uploadStatus.textContent = '';
+      loadProjectStatus(currentProjectId);
+    }, 1500);
+  } else if (failCount > 0) {
+    uploadStatus.textContent = `Failed to upload ${failCount} file(s).`;
+  }
+});
+
+// ── File management ───────────────────────────────────────────────────────────
+const deleteFilesBtn = document.getElementById('delete-files-btn');
+const reindexFilesBtn = document.getElementById('reindex-files-btn');
+
+deleteFilesBtn.addEventListener('click', deleteSelectedFiles);
+reindexFilesBtn.addEventListener('click', reindexSelectedFiles);
 
 // ── Send / input ──────────────────────────────────────────────────────────────
 sendBtn.addEventListener('click', sendMessage);
