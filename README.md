@@ -1,10 +1,12 @@
-# ai-ally-light
+# AI Ally Light
 An accessible, light-weight, local multi-project RAG chat system.
 
 ## Features
 - Ollama for embeddings (CPU-friendly, no GPU needed)
 - OpenRouter for the LLM
-- Plain HTML browser interface, fully accessible with NVDA
+- Plain HTML browser interface, fully accessible with screen readers (NVDA tested)
+- Environment variable configuration for Ollama settings
+- Separate Default and Project-level settings
 
 ---
 
@@ -22,7 +24,7 @@ An accessible, light-weight, local multi-project RAG chat system.
 ### 1. Install Python dependencies
 
 ```
-pip install flask chromadb requests watchdog
+pip install flask chromadb requests watchdog python-dotenv
 ```
 
 ### 2. Pull the embedding model
@@ -33,10 +35,21 @@ ollama pull nomic-embed-text
 
 This model is ~274 MB and runs on CPU — no GPU needed.
 
-### 3. Run the app
+### 3. Configure Ollama (optional)
+
+Create a `.env` file in the project root:
 
 ```
-python rag_chat.py
+OLLAMA_BASE_URL=http://127.0.0.1:11435
+OLLAMA_EMBED_MODEL=nomic-embed-text
+```
+
+The default values work for Ollama running on the same machine with the default port.
+
+### 4. Run the app
+
+```
+python ally.py
 ```
 
 Open your browser to: http://localhost:5000
@@ -45,9 +58,10 @@ Open your browser to: http://localhost:5000
 
 ## First-time setup
 
-On first run, open Settings (button in the project action bar) and enter:
-- Your OpenRouter API key
-- Your preferred model (default: openai/gpt-4o-mini)
+1. Click **Default Settings** in the header
+2. Enter your OpenRouter API key
+3. Choose your preferred model (default: openai/gpt-4o-mini)
+4. Click Save Settings
 
 Everything else can be left at defaults to start.
 
@@ -74,30 +88,39 @@ To manually trigger a full re-index (e.g. after adding many files), click Re-ind
 - Clear resets the conversation history but keeps the document index.
 
 ### Settings
-All settings are managed from the Settings dialog in the browser:
+Two settings dialogs are available:
+
+**Default Settings** (header button):
 - OpenRouter API key and model
 - Ollama URL and embedding model
 - Chunk size, overlap, and top-K results
 - System prompt
+- These apply to all projects unless overridden
+
+**Project Settings** (project action bar button):
+- Override model, top-K, or system prompt for the current project only
+- Leave blank to inherit the global default
 
 ---
 
 ## File structure
 
 ```
-rag_chat/
-  rag_chat.py         Main application
-  config.json         Settings (managed from the UI, also editable by hand)
-  projects.json       Project registry
+ai-ally-light/
+  ally.py              Main application
+  .env                 Ollama configuration (optional)
+  config.json          Settings (managed from the UI, also editable by hand)
+  projects.json        Project registry
   projects/
     my-project/
-      docs/           Put your .txt and .md files here
+      docs/            Put your .txt and .md files here
+      config.json      Project overrides (optional)
     other-project/
       docs/
-  chroma_db/          Vector database (do not delete)
   static/
-    index.html        Browser interface
-  README.md           This file
+    index.html         Browser interface
+  HISTORY.md           Development history
+  README.md            This file
 ```
 
 ---
@@ -105,21 +128,32 @@ rag_chat/
 ## Troubleshooting
 
 **Cannot reach Ollama**
-Make sure Ollama is running. Open a terminal and run: ollama serve
+Make sure Ollama is running. Open a terminal and run: `ollama serve`
 
 **Embedding model not found**
-Run: ollama pull nomic-embed-text
+Run: `ollama pull nomic-embed-text`
 
 **No API key / OpenRouter errors**
-Open Settings in the browser and enter your OpenRouter key.
+Open Default Settings in the header and enter your OpenRouter key.
 
 **Files not being indexed**
 Make sure they end in .txt or .md and are in the project's docs folder.
 Use the Re-index button if auto-indexing didn't pick them up.
 
 **Port 5000 in use**
-Edit the last line of rag_chat.py and change port=5000 to another port.
+The app will automatically try ports 5001-5020 if 5000 is in use.
 
 **Changed embedding model or chunk size?**
-Delete the chroma_db/ folder entirely and re-index. The old embeddings are
+Delete the project's `chroma_db/` folder and re-index. The old embeddings are
 incompatible with a new model or chunk size.
+
+---
+
+## Accessibility
+
+AI Ally Light is designed for screen reader users:
+- Semantic HTML structure
+- Keyboard navigable throughout
+- Skip links for quick navigation
+- ARIA labels and live regions for dynamic content
+- No complex visual elements that would confuse assistive technology
