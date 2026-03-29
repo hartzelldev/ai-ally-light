@@ -52,6 +52,8 @@ DEFAULT_CONFIG = {
     "chunk_size": 500,
     "chunk_overlap": 50,
     "top_k_results": 5,
+    "max_history_turns": 20,
+    "max_threads_display": 10,
     "system_prompt": (
         "You are a helpful assistant. Answer questions using the provided context. "
         "If the context doesn't contain relevant information, say so and answer "
@@ -166,6 +168,128 @@ def append_to_log(pid: str, session_id: str, role: str, content: str, sources: l
 
     with open(log_file, "a", encoding="utf-8") as f:
         f.write(block)
+
+# ── Threads ────────────────────────────────────────────────────────────────────
+def project_threads_dir(pid: str) -> Path:
+    """Return the threads directory for a project, creating it if needed."""
+    d = PROJECTS_DIR / pid / "threads"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+def load_threads(pid: str) -> dict:
+    """Load thread metadata for a project."""
+    meta_file = PROJECTS_DIR / pid / "threads.json"
+    if not meta_file.exists():
+        return {}
+    try:
+        return json.loads(meta_file.read_text())
+    except Exception:
+        return {}
+
+def save_threads(pid: str, threads: dict):
+    """Save thread metadata for a project."""
+    meta_file = PROJECTS_DIR / pid / "threads.json"
+    meta_file.write_text(json.dumps(threads, indent=2))
+
+def create_thread(pid: str, name: str = None) -> dict:
+    """Create a new thread and return its metadata."""
+    projects = load_projects()
+    proj_name = projects.get(pid, {}).get("name", pid)
+    
+    tid = datetime.now().strftime("%Y%m%d%H%M%S")
+    
+    if not name:
+        name = f"{proj_name} - {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+    
+    threads = load_threads(pid)
+    threads[tid] = {
+        "name": name,
+        "created": datetime.now().isoformat(),
+        "updated": datetime.now().isoformat()
+    }
+    save_threads(pid, threads)
+    
+    thread_file = project_threads_dir(pid) / f"{tid}.json"
+    thread_file.write_text(json.dumps({"messages": []}, indent=2))
+    
+    log.info(f"[{pid}] Created thread '{name}' ({tid})")
+    return {"id": tid, "name": name, "created": threads[tid]["created"], "updated": threads[tid]["updated"]}
+
+def load_thread(pid: str, tid: str) -> dict:
+    """Load thread conversation history."""
+    thread_file = project_threads_dir(pid) / f"{tid}.json"
+    if not thread_file.exists():
+        return {"messages": []}
+    try:
+        return json.loads(thread_file.read_text())
+    except Exception:
+        return {"messages": []}
+
+def save_thread(pid: str, tid: str, thread_data: dict):
+    """Save thread conversation history."""
+    thread_file = project_threads_dir(pid) / f"{tid}.json"
+    thread_file.write_text(json.dumps(thread_data, indent=2))
+    
+    threads = load_threads(pid)
+    if tid in threads:
+        threads[tid]["updated"] = datetime.now().isoformat()
+        save_threads(pid, threads)
+
+def add_message_to_thread(pid: str, tid: str, role: str, content: str, sources: list = None):
+    """Add a message to a thread."""
+    thread_data = load_thread(pid, tid)
+    message = {
+        "role": role,
+        "content": content,
+        "timestamp": datetime.now().isoformat()
+    }
+    if sources:
+        message["sources"] = sources
+    thread_data["messages"].append(message)
+    save_thread(pid, tid, thread_data)
+
+def rename_thread(pid: str, tid: str, new_name: str) -> bool:
+    """Rename a thread."""
+    threads = load_threads(pid)
+    if tid not in threads:
+        return False
+    threads[tid]["name"] = new_name
+    threads[tid]["updated"] = datetime.now().isoformat()
+    save_threads(pid, threads)
+    return True
+
+def delete_thread(pid: str, tid: str) -> bool:
+    """Delete a thread and its files."""
+    threads = load_threads(pid)
+    if tid not in threads:
+        return False
+    
+    del threads[tid]
+    save_threads(pid, threads)
+    
+    thread_file = project_threads_dir(pid) / f"{tid}.json"
+    if thread_file.exists():
+        thread_file.unlink()
+    
+    log.info(f"[{pid}] Deleted thread {tid}")
+    return True
+
+def get_thread_summary(pid: str) -> list:
+    """Get thread list with message counts."""
+    threads = load_threads(pid)
+    result = []
+    for tid, meta in threads.items():
+        thread_data = load_thread(pid, tid)
+        message_count = len(thread_data.get("messages", []))
+        result.append({
+            "id": tid,
+            "name": meta["name"],
+            "created": meta["created"],
+            "updated": meta["updated"],
+            "message_count": message_count
+        })
+    result.sort(key=lambda x: x["updated"], reverse=True)
+    return result
 
 # ── Ollama ────────────────────────────────────────────────────────────────────
 def get_embedding(text: str) -> list:
@@ -582,12 +706,15 @@ def api_save_settings():
     editable = [
         "openrouter_api_key", "openrouter_model",
         "ollama_base_url", "ollama_embed_model",
-        "chunk_size", "chunk_overlap", "top_k_results", "system_prompt"
+        "chunk_size", "chunk_overlap", "top_k_results",
+        "max_history_turns", "max_threads_display",
+        "system_prompt"
     ]
+    int_keys = ("chunk_size", "chunk_overlap", "top_k_results", "max_history_turns", "max_threads_display")
     for key in editable:
         if key in data and str(data[key]).strip() != "":
             val = data[key]
-            if key in ("chunk_size", "chunk_overlap", "top_k_results"):
+            if key in int_keys:
                 try:
                     val = int(val)
                 except ValueError:
@@ -791,6 +918,92 @@ def api_list_logs(pid):
         for f in files
     ])
 
+# ── Threads API ────────────────────────────────────────────────────────────────
+
+@app.route("/api/ally/projects/<pid>/threads")
+def api_list_threads(pid):
+    if pid not in load_projects():
+        return jsonify({"error": "Project not found."}), 404
+    
+    max_display = config.get("max_threads_display", 10)
+    all_threads = request.args.get("all", "false").lower() == "true"
+    
+    threads = get_thread_summary(pid)
+    
+    if not all_threads:
+        threads = threads[:max_display]
+    
+    has_more = len(get_thread_summary(pid)) > max_display if not all_threads else False
+    
+    return jsonify({
+        "threads": threads,
+        "has_more": has_more,
+        "max_display": max_display
+    })
+
+@app.route("/api/ally/projects/<pid>/threads", methods=["POST"])
+def api_create_thread(pid):
+    if pid not in load_projects():
+        return jsonify({"error": "Project not found."}), 404
+    data = request.json or {}
+    name = data.get("name")
+    thread = create_thread(pid, name)
+    return jsonify(thread), 201
+
+@app.route("/api/ally/projects/<pid>/threads/<tid>")
+def api_get_thread(pid, tid):
+    if pid not in load_projects():
+        return jsonify({"error": "Project not found."}), 404
+    thread_data = load_thread(pid, tid)
+    if not thread_data:
+        return jsonify({"error": "Thread not found."}), 404
+    
+    max_turns = config.get("max_history_turns", 20)
+    messages = thread_data.get("messages", [])
+    
+    return jsonify({
+        "messages": messages[-max_turns:] if len(messages) > max_turns else messages,
+        "total_messages": len(messages),
+        "showing_messages": min(len(messages), max_turns)
+    })
+
+@app.route("/api/ally/projects/<pid>/threads/<tid>", methods=["PUT"])
+def api_update_thread(pid, tid):
+    if pid not in load_projects():
+        return jsonify({"error": "Project not found."}), 404
+    data = request.json or {}
+    
+    if "name" in data:
+        if rename_thread(pid, tid, data["name"]):
+            return jsonify({"success": True})
+        return jsonify({"error": "Thread not found."}), 404
+    
+    return jsonify({"error": "No updates provided."}), 400
+
+@app.route("/api/ally/projects/<pid>/threads/<tid>", methods=["DELETE"])
+def api_delete_thread(pid, tid):
+    if pid not in load_projects():
+        return jsonify({"error": "Project not found."}), 404
+    if delete_thread(pid, tid):
+        return jsonify({"success": True})
+    return jsonify({"error": "Thread not found."}), 404
+
+@app.route("/api/ally/projects/<pid>/threads/batch-delete", methods=["POST"])
+def api_delete_threads_batch(pid):
+    if pid not in load_projects():
+        return jsonify({"error": "Project not found."}), 404
+    data = request.json or {}
+    tids = data.get("thread_ids", [])
+    if not tids:
+        return jsonify({"error": "No thread IDs provided."}), 400
+    
+    deleted = []
+    for tid in tids:
+        if delete_thread(pid, tid):
+            deleted.append(tid)
+    
+    return jsonify({"success": True, "deleted": deleted})
+
 # Chat
 @app.route("/api/ally/projects/<pid>/chat", methods=["POST"])
 def api_chat(pid):
@@ -798,25 +1011,31 @@ def api_chat(pid):
         return jsonify({"error": "Project not found."}), 404
     data = request.json
     messages = data.get("messages", [])
-    session_id = data.get("session_id", datetime.now().strftime("%Y-%m-%d"))
+    thread_id = data.get("thread_id")
+    
     if not messages:
         return jsonify({"error": "No messages provided."}), 400
+    
     last_user = next((m["content"] for m in reversed(messages) if m["role"] == "user"), "")
-
-    if last_user:
-        append_to_log(pid, session_id, "user", last_user)
 
     cfg = effective_config(pid)
     chunks = retrieve(pid, last_user, cfg) if last_user else []
     reply = chat_with_llm(messages, chunks, cfg)
     sources = [{"filename": c["filename"], "score": c["score"]} for c in chunks]
 
-    append_to_log(pid, session_id, "assistant", reply, sources)
+    if thread_id:
+        add_message_to_thread(pid, thread_id, "user", last_user)
+        add_message_to_thread(pid, thread_id, "assistant", reply, sources)
+    else:
+        thread = create_thread(pid)
+        thread_id = thread["id"]
+        add_message_to_thread(pid, thread_id, "user", last_user)
+        add_message_to_thread(pid, thread_id, "assistant", reply, sources)
 
     return jsonify({
         "reply": reply,
         "sources": sources,
-        "session_id": session_id,
+        "thread_id": thread_id,
         "model": cfg["openrouter_model"]
     })
 

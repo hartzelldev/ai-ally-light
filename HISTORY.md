@@ -11,6 +11,10 @@
 - **Screen Reader Optimized Sources**: Sources display includes document title, section, and position with ARIA labels
 - **File Upload**: Upload documents (.txt, .md) directly from browser
 - **File Management**: Select and delete/reindex individual files from the index
+- **Named Threads**: User-named chat threads with timestamp-based default names
+- **Thread Management**: Create, rename, and delete threads from the UI
+- **Configurable History**: Limit conversation turns sent to AI (default: 20)
+- **Configurable Thread Display**: Show recent N threads in sidebar (default: 10)
 
 ### Technical
 - `/api/ally/` API prefix for all endpoints
@@ -20,6 +24,7 @@
 - Markdown heading extraction for section tagging
 - Chunk position metadata: "beginning", "middle", "end", or "full"
 - Upload and file management API endpoints
+- Thread storage: JSON for loading, markdown for audit
 
 ---
 

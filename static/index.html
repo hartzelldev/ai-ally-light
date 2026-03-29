@@ -519,11 +519,29 @@
       <p id="embed-info" style="font-family:var(--mono);font-size:0.78rem;">—</p>
     </div>
     <div class="panel-section">
-      <h2>Session Logs</h2>
-      <p id="session-id-display" style="font-size:0.78rem;font-family:var(--mono);color:var(--text-dim);">—</p>
-      <ul id="log-files" aria-label="Saved log files" style="list-style:none;display:flex;flex-direction:column;gap:0.25rem;"></ul>
+      <h2>Threads</h2>
+      <button id="new-thread-btn" class="secondary" style="font-size:0.8rem;padding:0.3rem 0.5rem;margin-bottom:0.5rem;">New Thread</button>
+      <div id="thread-actions" style="display:none;margin-bottom:0.5rem;">
+        <button id="delete-threads-btn" class="danger" style="font-size:0.8rem;padding:0.3rem 0.5rem;">Delete Selected</button>
+        <button id="rename-thread-btn" class="secondary" style="font-size:0.8rem;padding:0.3rem 0.5rem;">Rename</button>
+      </div>
+      <ul id="thread-list" aria-label="Chat threads" style="list-style:none;padding:0;"></ul>
+      <button id="show-more-threads-btn" class="secondary" style="display:none;font-size:0.75rem;padding:0.2rem 0.4rem;margin-top:0.25rem;">Show more threads</button>
     </div>
   </aside>
+
+  <!-- Rename thread dialog -->
+  <dialog id="rename-thread-dialog" aria-labelledby="rename-thread-title">
+    <h2 id="rename-thread-title">Rename Thread</h2>
+    <div class="field">
+      <label for="rename-thread-input">New name</label>
+      <input type="text" id="rename-thread-input" />
+    </div>
+    <div class="dialog-actions">
+      <button id="rename-thread-cancel-btn" class="secondary">Cancel</button>
+      <button id="rename-thread-save-btn">Rename</button>
+    </div>
+  </dialog>
 
 </div>
 
@@ -564,6 +582,16 @@
     <div class="field">
       <label for="s-topk">Default Top K Results</label>
       <input type="text" id="s-topk" />
+    </div>
+    <div class="field">
+      <label for="s-history-turns">Max History Turns</label>
+      <input type="text" id="s-history-turns" />
+      <small>Number of past messages sent to AI per thread</small>
+    </div>
+    <div class="field">
+      <label for="s-threads-display">Threads to Show</label>
+      <input type="text" id="s-threads-display" />
+      <small>Number of recent threads to show in sidebar</small>
     </div>
     <div class="field">
       <label for="s-system">Default System Prompt</label>
@@ -721,6 +749,7 @@ function renderProjectList() {
 // ── Select project ────────────────────────────────────────────────────────────
 async function selectProject(pid) {
   currentProjectId = pid;
+  currentThreadId = null;
   conversationHistories[pid] = conversationHistories[pid] || [];
 
   renderProjectList();
@@ -733,6 +762,7 @@ async function selectProject(pid) {
 
   renderMessages(pid);
   await loadProjectStatus(pid);
+  await loadThreads();
   userInput.focus();
 }
 
@@ -967,13 +997,17 @@ async function sendMessage() {
   const thinkingEl = addThinking();
 
   try {
+    const payload = {
+      messages: history.map(m => ({ role: m.role, content: m.content }))
+    };
+    if (currentThreadId) {
+      payload.thread_id = currentThreadId;
+    }
+    
     const r = await fetch(`/api/ally/projects/${currentProjectId}/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        messages: history.map(m => ({ role: m.role, content: m.content })),
-        session_id: currentSessionId
-      })
+      body: JSON.stringify(payload)
     });
     const data = await r.json();
     thinkingEl.remove();
@@ -988,6 +1022,12 @@ async function sendMessage() {
       const assistantMsg = { role: 'assistant', content: data.reply, _sources: data.sources };
       history.push(assistantMsg);
       addMessageEl('assistant', data.reply, data.sources);
+      
+      if (data.thread_id && data.thread_id !== currentThreadId) {
+        currentThreadId = data.thread_id;
+      }
+      
+      loadThreads(showingAllThreads);
     }
   } catch {
     thinkingEl.remove();
@@ -1064,12 +1104,15 @@ deleteBtn.addEventListener('click', async () => {
   if (d.error) { alert(d.error); return; }
   delete conversationHistories[currentProjectId];
   currentProjectId = null;
+  currentThreadId = null;
   chatArea.hidden = true;
   noProjectMsg.hidden = false;
   await loadProjects();
   chunkCount.textContent = '—';
   indexedFiles.innerHTML = '';
   document.getElementById('file-actions').style.display = 'none';
+  document.getElementById('thread-list').innerHTML = '';
+  document.getElementById('thread-actions').style.display = 'none';
 });
 
 // ── Re-index ──────────────────────────────────────────────────────────────────
@@ -1166,6 +1209,222 @@ const reindexFilesBtn = document.getElementById('reindex-files-btn');
 deleteFilesBtn.addEventListener('click', deleteSelectedFiles);
 reindexFilesBtn.addEventListener('click', reindexSelectedFiles);
 
+// ── Threads ───────────────────────────────────────────────────────────────────
+let currentThreadId = null;
+let threadList = [];
+let showingAllThreads = false;
+
+async function loadThreads(showAll = false) {
+  if (!currentProjectId) return;
+  try {
+    const url = showAll 
+      ? `/api/ally/projects/${currentProjectId}/threads?all=true`
+      : `/api/ally/projects/${currentProjectId}/threads`;
+    const r = await fetch(url);
+    const d = await r.json();
+    threadList = d.threads;
+    showingAllThreads = showAll;
+    renderThreadList();
+  } catch {
+    console.error('Failed to load threads');
+  }
+}
+
+function renderThreadList() {
+  const threadListEl = document.getElementById('thread-list');
+  const threadActions = document.getElementById('thread-actions');
+  const showMoreBtn = document.getElementById('show-more-threads-btn');
+  
+  threadListEl.innerHTML = '';
+  
+  if (!currentProjectId) {
+    threadActions.style.display = 'none';
+    showMoreBtn.style.display = 'none';
+    return;
+  }
+  
+  if (threadList.length === 0) {
+    const li = document.createElement('li');
+    li.style.fontSize = '0.78rem';
+    li.style.color = 'var(--text-dim)';
+    li.textContent = 'No threads yet. Start a new conversation.';
+    threadListEl.appendChild(li);
+    threadActions.style.display = 'none';
+    showMoreBtn.style.display = 'none';
+    return;
+  }
+  
+  threadActions.style.display = 'block';
+  showMoreBtn.style.display = showingAllThreads ? 'none' : 'inline-block';
+  
+  for (const thread of threadList) {
+    const li = document.createElement('li');
+    li.style.marginBottom = '0.35rem';
+    li.style.display = 'flex';
+    li.style.alignItems = 'center';
+    li.style.gap = '0.4rem';
+    
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.id = `thread-${thread.id}`;
+    checkbox.value = thread.id;
+    checkbox.className = 'thread-checkbox';
+    checkbox.style.margin = '0';
+    
+    const label = document.createElement('label');
+    label.htmlFor = `thread-${thread.id}`;
+    label.style.fontSize = '0.82rem';
+    label.style.cursor = 'pointer';
+    label.style.flex = '1';
+    
+    const nameSpan = document.createElement('span');
+    nameSpan.textContent = thread.name;
+    nameSpan.style.fontWeight = currentThreadId === thread.id ? 'bold' : 'normal';
+    nameSpan.style.color = currentThreadId === thread.id ? 'var(--accent)' : 'inherit';
+    
+    const metaSpan = document.createElement('span');
+    metaSpan.style.fontSize = '0.7rem';
+    metaSpan.style.color = 'var(--text-dim)';
+    metaSpan.textContent = ` (${thread.message_count})`;
+    
+    label.appendChild(nameSpan);
+    label.appendChild(metaSpan);
+    
+    label.addEventListener('click', (e) => {
+      if (e.target.tagName !== 'INPUT') {
+        selectThread(thread.id);
+      }
+    });
+    
+    li.appendChild(checkbox);
+    li.appendChild(label);
+    threadListEl.appendChild(li);
+  }
+}
+
+async function selectThread(tid) {
+  if (!currentProjectId) return;
+  
+  try {
+    const r = await fetch(`/api/ally/projects/${currentProjectId}/threads/${tid}`);
+    const d = await r.json();
+    
+    currentThreadId = tid;
+    conversationHistories[currentProjectId] = d.messages.map(m => ({
+      role: m.role,
+      content: m.content
+    }));
+    
+    renderMessages(currentProjectId);
+    renderThreadList();
+    
+    setStatus(`Loaded thread: ${threadList.find(t => t.id === tid)?.name || tid}`);
+  } catch {
+    setStatus('Failed to load thread.');
+  }
+}
+
+async function createNewThread() {
+  if (!currentProjectId) return;
+  
+  try {
+    const r = await fetch(`/api/ally/projects/${currentProjectId}/threads`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({})
+    });
+    const d = await r.json();
+    
+    currentThreadId = d.id;
+    conversationHistories[currentProjectId] = [];
+    renderMessages(currentProjectId);
+    await loadThreads();
+    
+    setStatus(`Created new thread: ${d.name}`);
+  } catch {
+    setStatus('Failed to create thread.');
+  }
+}
+
+async function deleteSelectedThreads() {
+  if (!currentProjectId) return;
+  
+  const checkboxes = document.querySelectorAll('.thread-checkbox:checked');
+  const tids = Array.from(checkboxes).map(cb => cb.value);
+  
+  if (!tids.length) return;
+  
+  if (!confirm(`Delete ${tids.length} thread(s)? This cannot be undone.`)) return;
+  
+  try {
+    const r = await fetch(`/api/ally/projects/${currentProjectId}/threads/batch-delete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ thread_ids: tids })
+    });
+    
+    if (currentThreadId && tids.includes(currentThreadId)) {
+      currentThreadId = null;
+      conversationHistories[currentProjectId] = [];
+      renderMessages(currentProjectId);
+    }
+    
+    await loadThreads();
+    setStatus(`Deleted ${tids.length} thread(s).`);
+  } catch {
+    setStatus('Failed to delete threads.');
+  }
+}
+
+async function renameSelectedThread() {
+  if (!currentProjectId) return;
+  
+  const checkboxes = document.querySelectorAll('.thread-checkbox:checked');
+  if (checkboxes.length !== 1) {
+    alert('Please select exactly one thread to rename.');
+    return;
+  }
+  
+  const tid = checkboxes[0].value;
+  const thread = threadList.find(t => t.id === tid);
+  if (!thread) return;
+  
+  const input = document.getElementById('rename-thread-input');
+  input.value = thread.name;
+  
+  const dialog = document.getElementById('rename-thread-dialog');
+  dialog.showModal();
+  input.focus();
+  
+  const saveRename = async () => {
+    const newName = input.value.trim();
+    if (!newName) return;
+    
+    try {
+      await fetch(`/api/ally/projects/${currentProjectId}/threads/${tid}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newName })
+      });
+      
+      dialog.close();
+      await loadThreads(showingAllThreads);
+      setStatus(`Renamed thread to: ${newName}`);
+    } catch {
+      setStatus('Failed to rename thread.');
+    }
+  };
+  
+  document.getElementById('rename-thread-save-btn').onclick = saveRename;
+  document.getElementById('rename-thread-cancel-btn').onclick = () => dialog.close();
+}
+
+// Thread event listeners
+document.getElementById('new-thread-btn').addEventListener('click', createNewThread);
+document.getElementById('delete-threads-btn').addEventListener('click', deleteSelectedThreads);
+document.getElementById('rename-thread-btn').addEventListener('click', renameSelectedThread);
+document.getElementById('show-more-threads-btn').addEventListener('click', () => loadThreads(true));
+
 // ── Send / input ──────────────────────────────────────────────────────────────
 sendBtn.addEventListener('click', sendMessage);
 userInput.addEventListener('keydown', e => {
@@ -1210,6 +1469,8 @@ async function openSettings(mode) {
   document.getElementById('s-chunk-size').value = d.chunk_size || '';
   document.getElementById('s-overlap').value = d.chunk_overlap || '';
   document.getElementById('s-topk').value = d.top_k_results || '';
+  document.getElementById('s-history-turns').value = d.max_history_turns || '';
+  document.getElementById('s-threads-display').value = d.max_threads_display || '';
   document.getElementById('s-system').value = d.system_prompt || '';
 
   if (mode === 'project' && currentProjectId) {
@@ -1251,6 +1512,8 @@ document.getElementById('settings-save-btn').addEventListener('click', async () 
     chunk_size:         document.getElementById('s-chunk-size').value,
     chunk_overlap:      document.getElementById('s-overlap').value,
     top_k_results:      document.getElementById('s-topk').value,
+    max_history_turns:  document.getElementById('s-history-turns').value,
+    max_threads_display: document.getElementById('s-threads-display').value,
     system_prompt:      document.getElementById('s-system').value,
   };
   const key = document.getElementById('s-api-key').value.trim();
