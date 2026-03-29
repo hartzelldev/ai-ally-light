@@ -43,4 +43,5 @@ config.json
 
 # App specific
 projects/
+projects.json
 
