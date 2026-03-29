@@ -262,13 +262,13 @@
       border-radius: 3px;
       padding: 0.7rem 0.9rem;
     }
-    .role-label {
+    h2.role-label {
       font-size: 0.72rem;
+      font-weight: normal;
       text-transform: uppercase;
       letter-spacing: 0.08em;
       color: var(--text-dim);
-      margin-bottom: 0.3rem;
-      display: block;
+      margin: 0 0 0.3rem 0;
     }
     .content { white-space: pre-wrap; line-height: 1.65; }
     .message.user {
@@ -813,7 +813,7 @@ function addMessageEl(role, content, sources) {
   const div = document.createElement('div');
   div.classList.add('message', role === 'user' ? 'user' : 'assistant');
 
-  const label = document.createElement('span');
+  const label = document.createElement('h2');
   label.className = 'role-label';
   label.textContent = role === 'user' ? 'You' : 'Assistant';
   div.appendChild(label);
