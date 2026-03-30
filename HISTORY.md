@@ -3,9 +3,10 @@
 ## v0.2 (2026-03-28)
 
 ### Features
-- **Environment Variable Configuration**: Ollama URL and model loaded from `.env` file via python-dotenv
+- **Multi-Provider LLM Support**: Chat with OpenRouter, Groq, TogetherAI, Ollama, or custom providers
+- **Multi-Provider Embeddings**: Use Ollama, OpenRouter, HuggingFace, or custom endpoints
+- **Secure API Key Storage**: API keys stored in `.env` file (not in config.json)
 - **Separated Settings UI**: Default Settings (header button) and Project Settings clearly distinguished
-- **WSL Compatibility**: Default Ollama URL uses `127.0.0.1` instead of `localhost`
 - **Enhanced Chunking**: Sentence-aware chunking preserves complete sentences
 - **Rich Document Metadata**: Each chunk tagged with title, section, and position
 - **Screen Reader Optimized Sources**: Sources display includes document title, section, and position with ARIA labels
@@ -18,12 +19,13 @@
 
 ### Technical
 - `/api/ally/` API prefix for all endpoints
-- Default Ollama URL: `http://127.0.0.1:11435`
-- Default embedding model: `nomic-embed-text`
+- Modular provider architecture in `providers/` directory
+- API keys stored in `.env` file for security
+- Chat providers: OpenRouter, Groq, TogetherAI, Ollama, Custom
+- Embedding providers: Ollama, OpenRouter, HuggingFace, Custom
 - Sentence-aware text chunking (regex-based)
 - Markdown heading extraction for section tagging
 - Chunk position metadata: "beginning", "middle", "end", or "full"
-- Upload and file management API endpoints
 - Thread storage: JSON for loading, markdown for audit
 
 ---

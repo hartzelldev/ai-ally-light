@@ -552,25 +552,70 @@
   <h3 id="global-settings-header" style="font-size:0.85rem;font-weight:normal;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:0.75rem;">Global Defaults</h3>
 
   <div id="global-settings-fields">
-    <div class="field">
-      <label for="s-api-key">OpenRouter API Key</label>
-      <input type="password" id="s-api-key" placeholder="Leave blank to keep current key" autocomplete="off" />
-      <small id="s-key-masked"></small>
-    </div>
-    <div class="field">
-      <label for="s-model">Default Model</label>
-      <input type="text" id="s-model" placeholder="e.g. openai/gpt-4o-mini" />
-      <small>Find model slugs at openrouter.ai/models</small>
-    </div>
-    <div class="field">
-      <label for="s-ollama-url">Ollama Base URL</label>
-      <input type="text" id="s-ollama-url" placeholder="http://localhost:11434" />
-    </div>
-    <div class="field">
-      <label for="s-embed-model">Ollama Embedding Model</label>
-      <input type="text" id="s-embed-model" placeholder="nomic-embed-text" />
-      <small>Change requires re-indexing all projects.</small>
-    </div>
+    <!-- Chat Settings -->
+    <fieldset style="border:1px solid var(--border);border-radius:4px;padding:1rem;margin-bottom:1rem;">
+      <legend style="font-weight:bold;padding:0 0.5rem;">Chat</legend>
+      
+      <div class="field">
+        <label for="s-chat-provider">Provider</label>
+        <select id="s-chat-provider" style="width:100%;padding:0.4rem;">
+          <option value="openrouter">OpenRouter</option>
+          <option value="groq">Groq</option>
+          <option value="togetherai">TogetherAI</option>
+          <option value="ollama">Local (Ollama)</option>
+          <option value="other">Other (Custom)</option>
+        </select>
+      </div>
+      
+      <div id="chat-api-key-section" class="field">
+        <label for="s-chat-api-key">API Key</label>
+        <input type="password" id="s-chat-api-key" placeholder="Leave blank to keep current key" autocomplete="off" />
+        <small id="s-chat-key-masked"></small>
+      </div>
+      
+      <div id="chat-base-url-section" class="field" style="display:none;">
+        <label for="s-chat-base-url">Base URL</label>
+        <input type="text" id="s-chat-base-url" placeholder="http://localhost:11434" />
+      </div>
+      
+      <div class="field">
+        <label for="s-chat-model">Model</label>
+        <input type="text" id="s-chat-model" placeholder="e.g. openai/gpt-4o-mini" />
+        <small><a id="s-chat-model-url" href="https://openrouter.ai/models" target="_blank" rel="noopener">Find models</a></small>
+      </div>
+    </fieldset>
+    
+    <!-- Embedding Settings -->
+    <fieldset style="border:1px solid var(--border);border-radius:4px;padding:1rem;margin-bottom:1rem;">
+      <legend style="font-weight:bold;padding:0 0.5rem;">Embeddings</legend>
+      
+      <div class="field">
+        <label for="s-embed-provider">Provider</label>
+        <select id="s-embed-provider" style="width:100%;padding:0.4rem;">
+          <option value="ollama">Ollama (Local)</option>
+          <option value="openrouter">OpenRouter</option>
+          <option value="huggingface">HuggingFace</option>
+          <option value="other">Other (Custom)</option>
+        </select>
+      </div>
+      
+      <div id="embed-api-key-section" class="field" style="display:none;">
+        <label for="s-embed-api-key">API Key</label>
+        <input type="password" id="s-embed-api-key" placeholder="Leave blank to keep current key" autocomplete="off" />
+      </div>
+      
+      <div class="field">
+        <label for="s-embed-base-url">Base URL</label>
+        <input type="text" id="s-embed-base-url" placeholder="http://localhost:11434" />
+      </div>
+      
+      <div class="field">
+        <label for="s-embed-model">Model</label>
+        <input type="text" id="s-embed-model" placeholder="e.g. nomic-embed-text" />
+        <small><a id="s-embed-model-url" href="https://ollama.com/library" target="_blank" rel="noopener">Find models</a></small>
+      </div>
+    </fieldset>
+    
     <div class="field">
       <label for="s-chunk-size">Chunk Size (words)</label>
       <input type="text" id="s-chunk-size" />
@@ -1438,6 +1483,54 @@ userInput.addEventListener('input', () => {
 // ── Settings ──────────────────────────────────────────────────────────────────
 let settingsMode = 'project'; // 'default' or 'project'
 
+const CHAT_PROVIDER_URLS = {
+  'openrouter': 'https://openrouter.ai/models',
+  'groq': 'https://console.groq.com/docs/models',
+  'togetherai': 'https://docs.together.ai/docs/serverless-models',
+  'ollama': 'https://ollama.com/library',
+  'other': ''
+};
+
+const EMBED_PROVIDER_URLS = {
+  'ollama': 'https://ollama.com/library',
+  'openrouter': 'https://openrouter.ai/models',
+  'huggingface': 'https://huggingface.co/models',
+  'other': ''
+};
+
+function updateChatFields() {
+  const provider = document.getElementById('s-chat-provider').value;
+  const apiKeySection = document.getElementById('chat-api-key-section');
+  const baseUrlSection = document.getElementById('chat-base-url-section');
+  const modelUrl = document.getElementById('s-chat-model-url');
+  
+  if (provider === 'ollama') {
+    apiKeySection.style.display = 'none';
+    baseUrlSection.style.display = 'block';
+  } else {
+    apiKeySection.style.display = 'block';
+    baseUrlSection.style.display = provider === 'other' ? 'block' : 'none';
+  }
+  
+  modelUrl.href = CHAT_PROVIDER_URLS[provider] || '#';
+  modelUrl.textContent = CHAT_PROVIDER_URLS[provider] ? 'Find models' : '';
+  modelUrl.style.display = CHAT_PROVIDER_URLS[provider] ? 'inline' : 'none';
+}
+
+function updateEmbedFields() {
+  const provider = document.getElementById('s-embed-provider').value;
+  const apiKeySection = document.getElementById('embed-api-key-section');
+  const baseUrlSection = document.getElementById('s-embed-base-url').parentElement;
+  
+  if (provider === 'ollama') {
+    apiKeySection.style.display = 'none';
+  } else {
+    apiKeySection.style.display = 'block';
+  }
+  
+  document.getElementById('s-embed-model-url').href = EMBED_PROVIDER_URLS[provider] || '#';
+}
+
 async function openSettings(mode) {
   settingsMode = mode;
   const projSection = document.getElementById('project-settings-section');
@@ -1459,13 +1552,23 @@ async function openSettings(mode) {
 
   const r = await fetch('/api/ally/settings');
   const d = await r.json();
-  document.getElementById('s-api-key').value = '';
-  document.getElementById('s-key-masked').textContent = d.openrouter_api_key_masked
-    ? `Current: ${d.openrouter_api_key_masked}`
+  
+  document.getElementById('s-chat-provider').value = d.chat_provider || 'openrouter';
+  document.getElementById('s-chat-api-key').value = '';
+  document.getElementById('s-chat-key-masked').textContent = d.chat_api_key_masked
+    ? `Current: ${d.chat_api_key_masked}`
     : 'No key set.';
-  document.getElementById('s-model').value = d.openrouter_model || '';
-  document.getElementById('s-ollama-url').value = d.ollama_base_url || '';
-  document.getElementById('s-embed-model').value = d.ollama_embed_model || '';
+  document.getElementById('s-chat-base-url').value = d.chat_base_url || '';
+  document.getElementById('s-chat-model').value = d.chat_model || '';
+  
+  document.getElementById('s-embed-provider').value = d.embed_provider || 'ollama';
+  document.getElementById('s-embed-api-key').value = '';
+  document.getElementById('s-embed-base-url').value = d.embed_base_url || '';
+  document.getElementById('s-embed-model').value = d.embed_model || '';
+  
+  updateChatFields();
+  updateEmbedFields();
+  
   document.getElementById('s-chunk-size').value = d.chunk_size || '';
   document.getElementById('s-overlap').value = d.chunk_overlap || '';
   document.getElementById('s-topk').value = d.top_k_results || '';
@@ -1495,7 +1598,7 @@ async function openSettings(mode) {
   }
 
   settingsDialog.showModal();
-  document.getElementById('s-api-key').focus();
+  document.getElementById('s-chat-model').focus();
 }
 
 defaultSettingsBtn.addEventListener('click', () => openSettings('default'));
@@ -1503,21 +1606,31 @@ settingsBtn.addEventListener('click', () => openSettings('project'));
 
 document.getElementById('settings-cancel-btn').addEventListener('click', () => settingsDialog.close());
 
+document.getElementById('s-chat-provider').addEventListener('change', updateChatFields);
+document.getElementById('s-embed-provider').addEventListener('change', updateEmbedFields);
+
 document.getElementById('settings-save-btn').addEventListener('click', async () => {
   // Always save global settings
   const payload = {
-    openrouter_model:   document.getElementById('s-model').value,
-    ollama_base_url:    document.getElementById('s-ollama-url').value,
-    ollama_embed_model: document.getElementById('s-embed-model').value,
-    chunk_size:         document.getElementById('s-chunk-size').value,
-    chunk_overlap:      document.getElementById('s-overlap').value,
-    top_k_results:      document.getElementById('s-topk').value,
-    max_history_turns:  document.getElementById('s-history-turns').value,
+    chat_provider: document.getElementById('s-chat-provider').value,
+    chat_model: document.getElementById('s-chat-model').value,
+    chat_base_url: document.getElementById('s-chat-base-url').value,
+    embed_provider: document.getElementById('s-embed-provider').value,
+    embed_base_url: document.getElementById('s-embed-base-url').value,
+    embed_model: document.getElementById('s-embed-model').value,
+    chunk_size: document.getElementById('s-chunk-size').value,
+    chunk_overlap: document.getElementById('s-overlap').value,
+    top_k_results: document.getElementById('s-topk').value,
+    max_history_turns: document.getElementById('s-history-turns').value,
     max_threads_display: document.getElementById('s-threads-display').value,
-    system_prompt:      document.getElementById('s-system').value,
+    system_prompt: document.getElementById('s-system').value,
   };
-  const key = document.getElementById('s-api-key').value.trim();
-  if (key) payload.openrouter_api_key = key;
+  
+  const chatKey = document.getElementById('s-chat-api-key').value.trim();
+  if (chatKey) payload.chat_api_key = chatKey;
+  
+  const embedKey = document.getElementById('s-embed-api-key').value.trim();
+  if (embedKey) payload.embed_api_key = embedKey;
 
   const r = await fetch('/api/ally/settings', {
     method: 'POST',

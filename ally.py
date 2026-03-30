@@ -1,5 +1,5 @@
 """
-ally.py — Multi-project RAG chat using Ollama embeddings + OpenRouter LLM.
+ally.py — Multi-project RAG chat using multiple LLM and embedding providers.
 
 Requirements:
     pip install flask chromadb requests watchdog python-dotenv
@@ -31,6 +31,10 @@ from chromadb.config import Settings
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
+from providers import chat as chat_providers
+from providers.embeddings import get_embedding as provider_get_embedding
+from providers.embeddings import check_provider_connection
+
 # ── Logging ───────────────────────────────────────────────────────────────────
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("rag_chat")
@@ -45,10 +49,16 @@ PROJECTS_DIR.mkdir(exist_ok=True)
 
 # ── Config ────────────────────────────────────────────────────────────────────
 DEFAULT_CONFIG = {
-    "openrouter_api_key": "",
-    "openrouter_model": "openai/gpt-4o-mini",
-    "ollama_base_url": os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11435"),
-    "ollama_embed_model": os.getenv("OLLAMA_EMBED_MODEL", "nomic-embed-text"),
+    "chat_provider": os.getenv("CHAT_PROVIDER", "openrouter"),
+    "chat_api_key": os.getenv("CHAT_API_KEY", ""),
+    "chat_model": os.getenv("CHAT_MODEL", "openai/gpt-4o-mini"),
+    "chat_base_url": os.getenv("CHAT_BASE_URL", ""),
+    
+    "embed_provider": os.getenv("EMBED_PROVIDER", "ollama"),
+    "embed_api_key": os.getenv("EMBED_API_KEY", ""),
+    "embed_model": os.getenv("EMBED_MODEL", "nomic-embed-text"),
+    "embed_base_url": os.getenv("EMBED_BASE_URL", "http://127.0.0.1:11434"),
+    
     "chunk_size": 500,
     "chunk_overlap": 50,
     "top_k_results": 5,
@@ -291,28 +301,40 @@ def get_thread_summary(pid: str) -> list:
     result.sort(key=lambda x: x["updated"], reverse=True)
     return result
 
-# ── Ollama ────────────────────────────────────────────────────────────────────
+# ── Embeddings ─────────────────────────────────────────────────────────────────
 def get_embedding(text: str) -> list:
-    url = f"{config['ollama_base_url']}/api/embeddings"
-    r = requests.post(url, json={"model": config["ollama_embed_model"], "prompt": text}, timeout=60)
-    r.raise_for_status()
-    return r.json()["embedding"]
+    provider = config.get("embed_provider", "ollama")
+    model = config.get("embed_model", "nomic-embed-text")
+    api_key = config.get("embed_api_key", "")
+    base_url = config.get("embed_base_url", "")
+    
+    return provider_get_embedding(provider, text, model, api_key, base_url or None)
+
+def check_embeddings_provider() -> tuple:
+    provider = config.get("embed_provider", "ollama")
+    base_url = config.get("embed_base_url", "")
+    
+    if provider == "ollama":
+        try:
+            url = (base_url or "http://127.0.0.1:11434") + "/api/tags"
+            r = requests.get(url, timeout=5)
+            models = [m["name"] for m in r.json().get("models", [])]
+            em = config.get("embed_model", "nomic-embed-text")
+            available = any(m == em or m.startswith(em + ":") for m in models)
+            if available:
+                return True, f"Ollama ready. Embedding model '{em}' found."
+            model_list = ", ".join(models) if models else "none"
+            return False, (
+                f"Ollama running but '{em}' not found. "
+                f"Available: {model_list}. Run: ollama pull {em}"
+            )
+        except Exception as e:
+            return False, f"Cannot reach Ollama at {base_url or 'http://127.0.0.1:11434'}: {e}"
+    else:
+        return check_provider_connection(provider, base_url or None)
 
 def check_ollama() -> tuple:
-    try:
-        r = requests.get(f"{config['ollama_base_url']}/api/tags", timeout=5)
-        models = [m["name"] for m in r.json().get("models", [])]
-        em = config["ollama_embed_model"]
-        available = any(m == em or m.startswith(em + ":") for m in models)
-        if available:
-            return True, f"Ollama ready. Embedding model '{em}' found."
-        model_list = ", ".join(models) if models else "none"
-        return False, (
-            f"Ollama running but '{em}' not found. "
-            f"Available: {model_list}. Run: ollama pull {em}"
-        )
-    except Exception:
-        return False, f"Cannot reach Ollama at {config['ollama_base_url']}. Is it running?"
+    return check_embeddings_provider()
 
 # ── Chunking ──────────────────────────────────────────────────────────────────
 import re
@@ -633,9 +655,14 @@ def retrieve(pid: str, query: str, cfg: dict = None) -> list:
 
 # ── OpenRouter ────────────────────────────────────────────────────────────────
 def chat_with_llm(messages: list, context_chunks: list, cfg: dict) -> str:
-    api_key = cfg.get("openrouter_api_key", "")
-    if not api_key:
-        return "Error: No OpenRouter API key set. Open the Settings panel and add your key."
+    provider = cfg.get("chat_provider", "openrouter")
+    model = cfg.get("chat_model", "openai/gpt-4o-mini")
+    api_key = cfg.get("chat_api_key", "")
+    base_url = cfg.get("chat_base_url", "")
+    
+    if chat_providers.CHAT_PROVIDERS.get(provider, {}).get("requires_api_key", True) and not api_key:
+        provider_name = chat_providers.CHAT_PROVIDERS.get(provider, {}).get("name", provider)
+        return f"Error: No API key set for {provider_name}. Open the Settings panel and add your key."
 
     if context_chunks:
         ctx = "\n\n".join(
@@ -646,29 +673,16 @@ def chat_with_llm(messages: list, context_chunks: list, cfg: dict) -> str:
     else:
         system = cfg["system_prompt"] + "\n\n(No relevant documents found for this query.)"
 
+    full_messages = [{"role": "system", "content": system}] + messages
+
     try:
-        r = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-                "HTTP-Referer": "http://localhost:5000",
-                "X-Title": "RAG Chat"
-            },
-            json={
-                "model": cfg["openrouter_model"],
-                "messages": [{"role": "system", "content": system}] + messages,
-            },
-            timeout=120
-        )
-        r.raise_for_status()
-        return r.json()["choices"][0]["message"]["content"]
+        return chat_providers.chat_with_provider(provider, full_messages, model, api_key, base_url or None)
     except requests.HTTPError as e:
         try:
             detail = e.response.json()
-            return f"OpenRouter error: {detail.get('error', {}).get('message', str(e))}"
+            return f"{provider.capitalize()} error: {detail.get('error', {}).get('message', str(e))}"
         except Exception:
-            return f"OpenRouter HTTP error: {e}"
+            return f"{provider.capitalize()} HTTP error: {e}"
     except Exception as e:
         return f"Request failed: {e}"
 
@@ -684,33 +698,74 @@ def index():
 def api_status():
     ollama_ok, ollama_msg = check_ollama()
     return jsonify({
-        "ollama_ok": ollama_ok,
-        "ollama_message": ollama_msg,
-        "openrouter_key_set": bool(config.get("openrouter_api_key")),
-        "model": config["openrouter_model"],
-        "embed_model": config["ollama_embed_model"],
+        "embed_ok": ollama_ok,
+        "embed_message": ollama_msg,
+        "chat_key_set": bool(config.get("chat_api_key")),
+        "chat_provider": config.get("chat_provider", "openrouter"),
+        "chat_model": config.get("chat_model", "openai/gpt-4o-mini"),
+        "embed_provider": config.get("embed_provider", "ollama"),
+        "embed_model": config.get("embed_model", "nomic-embed-text"),
     })
 
 # Settings
 @app.route("/api/ally/settings", methods=["GET"])
 def api_get_settings():
     safe = dict(config)
-    key = safe.get("openrouter_api_key", "")
-    safe["openrouter_api_key_masked"] = ("sk-or-…" + key[-4:]) if key else ""
-    safe["openrouter_api_key"] = ""  # never send the real key to browser
+    chat_key = safe.get("chat_api_key", "")
+    embed_key = safe.get("embed_api_key", "")
+    safe["chat_api_key_masked"] = ("sk-or-…" + chat_key[-4:]) if chat_key else ""
+    safe["chat_api_key"] = ""  # never send the real key to browser
+    safe["embed_api_key"] = ""  # never send the real key to browser
     return jsonify(safe)
+
+ENV_KEYS = {
+    "chat_provider": "CHAT_PROVIDER",
+    "chat_api_key": "CHAT_API_KEY",
+    "chat_model": "CHAT_MODEL",
+    "chat_base_url": "CHAT_BASE_URL",
+    "embed_provider": "EMBED_PROVIDER",
+    "embed_api_key": "EMBED_API_KEY",
+    "embed_model": "EMBED_MODEL",
+    "embed_base_url": "EMBED_BASE_URL",
+}
+
+def save_to_env(key: str, value: str):
+    """Save a key-value pair to .env file."""
+    env_path = BASE_DIR / ".env"
+    lines = []
+    key_written = False
+    
+    if env_path.exists():
+        with open(env_path) as f:
+            for line in f:
+                if line.startswith(f"{key}="):
+                    lines.append(f"{key}={value}\n")
+                    key_written = True
+                else:
+                    lines.append(line)
+    
+    if not key_written:
+        lines.append(f"{key}={value}\n")
+    
+    with open(env_path, "w") as f:
+        f.writelines(lines)
 
 @app.route("/api/ally/settings", methods=["POST"])
 def api_save_settings():
     data = request.json
-    editable = [
-        "openrouter_api_key", "openrouter_model",
-        "ollama_base_url", "ollama_embed_model",
-        "chunk_size", "chunk_overlap", "top_k_results",
-        "max_history_turns", "max_threads_display",
-        "system_prompt"
-    ]
+    
+    env_keys_to_save = {}
     int_keys = ("chunk_size", "chunk_overlap", "top_k_results", "max_history_turns", "max_threads_display")
+    
+    for old_key, env_key in ENV_KEYS.items():
+        if old_key in data and str(data[old_key]).strip() != "":
+            env_keys_to_save[env_key] = data[old_key]
+            config[old_key] = data[old_key]
+    
+    for key in env_keys_to_save:
+        save_to_env(key, env_keys_to_save[key])
+    
+    editable = ["chunk_size", "chunk_overlap", "top_k_results", "max_history_turns", "max_threads_display", "system_prompt"]
     for key in editable:
         if key in data and str(data[key]).strip() != "":
             val = data[key]
