@@ -744,15 +744,15 @@ async function loadSystemStatus() {
   try {
     const r = await fetch('/api/ally/status');
     const d = await r.json();
-    modelInfo.textContent = 'LLM: ' + d.model;
-    embedInfo.textContent = 'Embed: ' + d.embed_model;
-    if (!d.openrouter_key_set) {
+    modelInfo.textContent = 'LLM: ' + (d.chat_provider || 'unknown') + '/' + (d.chat_model || 'unknown');
+    embedInfo.textContent = 'Embed: ' + (d.embed_provider || 'unknown') + '/' + (d.embed_model || 'unknown');
+    if (!d.chat_key_set) {
       systemStatus.textContent = '● No API key';
       systemStatus.className = 'err';
-    } else if (!d.ollama_ok) {
-      systemStatus.textContent = '● Ollama not ready';
+    } else if (!d.embed_ok) {
+      systemStatus.textContent = '● Embeddings not ready';
       systemStatus.className = 'warn';
-      setStatus(d.ollama_message);
+      setStatus(d.embed_message);
     } else {
       systemStatus.textContent = '● Ready';
       systemStatus.className = 'ok';
