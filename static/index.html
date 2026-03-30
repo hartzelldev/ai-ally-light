@@ -543,6 +543,16 @@
     </div>
   </dialog>
 
+  <!-- Confirmation dialog -->
+  <dialog id="confirm-dialog" aria-labelledby="confirm-title" aria-describedby="confirm-message" role="alertdialog">
+    <h2 id="confirm-title">Confirm Action</h2>
+    <p id="confirm-message"></p>
+    <div class="dialog-actions">
+      <button id="confirm-cancel-btn" class="secondary">Cancel</button>
+      <button id="confirm-action-btn" class="danger">Delete</button>
+    </div>
+  </dialog>
+
 </div>
 
 <!-- Settings dialog -->
@@ -731,6 +741,39 @@ const renameDialog     = document.getElementById('rename-dialog');
 // ── Utilities ─────────────────────────────────────────────────────────────────
 function setStatus(msg) { statusBar.textContent = msg; }
 
+function showConfirm(title, message, actionLabel = 'Delete') {
+  return new Promise((resolve) => {
+    const dialog = document.getElementById('confirm-dialog');
+    document.getElementById('confirm-title').textContent = title;
+    document.getElementById('confirm-message').textContent = message;
+    const actionBtn = document.getElementById('confirm-action-btn');
+    actionBtn.textContent = actionLabel;
+    
+    const handleConfirm = () => {
+      cleanup();
+      resolve(true);
+    };
+    
+    const handleCancel = () => {
+      cleanup();
+      resolve(false);
+    };
+    
+    const cleanup = () => {
+      actionBtn.removeEventListener('click', handleConfirm);
+      document.getElementById('confirm-cancel-btn').removeEventListener('click', handleCancel);
+      dialog.removeEventListener('close', handleCancel);
+    };
+    
+    actionBtn.addEventListener('click', handleConfirm);
+    document.getElementById('confirm-cancel-btn').addEventListener('click', handleCancel);
+    dialog.addEventListener('close', handleCancel);
+    
+    dialog.showModal();
+    actionBtn.focus();
+  });
+}
+
 function scrollBottom() { messagesEl.scrollTop = messagesEl.scrollHeight; }
 
 function setInputDisabled(v) {
@@ -900,7 +943,11 @@ async function deleteSelectedFiles() {
   const selected = getSelectedFiles();
   if (!selected.length) return;
   
-  if (!confirm(`Delete ${selected.length} file(s) from the index? The files will remain in the docs folder.`)) return;
+  const confirmed = await showConfirm(
+    'Delete Files',
+    `Delete ${selected.length} file(s) from the index? The files will remain in the docs folder.`
+  );
+  if (!confirmed) return;
   
   try {
     const r = await fetch(`/api/ally/projects/${currentProjectId}/files`, {
@@ -1143,7 +1190,11 @@ document.getElementById('rename-save-btn').addEventListener('click', async () =>
 deleteBtn.addEventListener('click', async () => {
   const proj = projects.find(p => p.id === currentProjectId);
   const name = proj ? proj.name : currentProjectId;
-  if (!confirm(`Delete project "${name}" and all its indexed documents? This cannot be undone.`)) return;
+  const confirmed = await showConfirm(
+    'Delete Project',
+    `Delete project "${name}" and all its indexed documents? This cannot be undone.`
+  );
+  if (!confirmed) return;
   const r = await fetch(`/api/ally/projects/${currentProjectId}`, { method: 'DELETE' });
   const d = await r.json();
   if (d.error) { alert(d.error); return; }
@@ -1399,7 +1450,11 @@ async function deleteSelectedThreads() {
   
   if (!tids.length) return;
   
-  if (!confirm(`Delete ${tids.length} thread(s)? This cannot be undone.`)) return;
+  const confirmed = await showConfirm(
+    'Delete Threads',
+    `Delete ${tids.length} thread(s)? This cannot be undone.`
+  );
+  if (!confirmed) return;
   
   try {
     const r = await fetch(`/api/ally/projects/${currentProjectId}/threads/batch-delete`, {
