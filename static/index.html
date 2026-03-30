@@ -751,11 +751,13 @@ function showConfirm(title, message, actionLabel = 'Delete') {
     
     const handleConfirm = () => {
       cleanup();
+      dialog.close();
       resolve(true);
     };
     
     const handleCancel = () => {
       cleanup();
+      dialog.close();
       resolve(false);
     };
     
