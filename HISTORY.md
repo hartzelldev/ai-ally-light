@@ -1,5 +1,20 @@
 # AI Ally Light - Development History
 
+## v0.3 (2026-03-30)
+
+### Features
+- **Audio Notifications**: Sound alerts for AI responses, indexing completion, and errors
+  - Pleasant chime when AI responds to a question
+  - Ascending three-tone sequence when indexing completes
+  - Warning beep for errors and attention needed
+- **Global Sound Toggle**: Enable/disable notification sounds from Default Settings
+
+### Technical
+- Web Audio API for sound generation (no external files needed)
+- Sounds respect the `sound_enabled` setting
+
+---
+
 ## v0.2 (2026-03-28)
 
 ### Features

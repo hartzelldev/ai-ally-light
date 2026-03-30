@@ -64,6 +64,7 @@ DEFAULT_CONFIG = {
     "top_k_results": 5,
     "max_history_turns": 20,
     "max_threads_display": 10,
+    "sound_enabled": True,
     "system_prompt": (
         "You are a helpful assistant. Answer questions using the provided context. "
         "If the context doesn't contain relevant information, say so and answer "
@@ -775,6 +776,10 @@ def api_save_settings():
                 except ValueError:
                     continue
             config[key] = val
+    
+    if "sound_enabled" in data:
+        config["sound_enabled"] = bool(data["sound_enabled"])
+    
     save_config(config)
     return jsonify({"success": True})
 

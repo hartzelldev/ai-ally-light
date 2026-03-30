@@ -649,6 +649,12 @@
       <small>Number of recent threads to show in sidebar</small>
     </div>
     <div class="field">
+      <label>
+        <input type="checkbox" id="s-sound-enabled" /> Enable sounds
+      </label>
+      <small>Play sounds for AI responses and indexing</small>
+    </div>
+    <div class="field">
       <label for="s-system">Default System Prompt</label>
       <textarea id="s-system"></textarea>
     </div>
@@ -777,6 +783,96 @@ function showConfirm(title, message, actionLabel = 'Delete') {
 }
 
 function scrollBottom() { messagesEl.scrollTop = messagesEl.scrollHeight; }
+
+// ── Audio notifications ─────────────────────────────────────────────────────────
+let audioContext = null;
+
+function getAudioContext() {
+  if (!audioContext) {
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  return audioContext;
+}
+
+function playTone(frequency, duration, type = 'sine', volume = 0.3) {
+  if (!window.soundEnabled) return;
+  try {
+    const ctx = getAudioContext();
+    const oscillator = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(ctx.destination);
+    
+    oscillator.frequency.value = frequency;
+    oscillator.type = type;
+    gainNode.gain.value = volume;
+    
+    oscillator.start();
+    oscillator.stop(ctx.currentTime + duration);
+  } catch (e) {
+    console.warn('Audio playback failed:', e);
+  }
+}
+
+function playResponseSound() {
+  if (!window.soundEnabled) return;
+  const ctx = getAudioContext();
+  const now = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  
+  osc.frequency.setValueAtTime(523.25, now);
+  osc.frequency.setValueAtTime(659.25, now + 0.1);
+  osc.type = 'sine';
+  gain.gain.setValueAtTime(0.2, now);
+  gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+  
+  osc.start(now);
+  osc.stop(now + 0.3);
+}
+
+function playIndexSound() {
+  if (!window.soundEnabled) return;
+  const ctx = getAudioContext();
+  const now = ctx.currentTime;
+  
+  [523.25, 659.25, 783.99].forEach((freq, i) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.value = freq;
+    osc.type = 'sine';
+    gain.gain.setValueAtTime(0.15, now + i * 0.1);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.1 + 0.15);
+    osc.start(now + i * 0.1);
+    osc.stop(now + i * 0.1 + 0.15);
+  });
+}
+
+function playAlertSound() {
+  if (!window.soundEnabled) return;
+  const ctx = getAudioContext();
+  const now = ctx.currentTime;
+  
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  
+  osc.frequency.setValueAtTime(440, now);
+  osc.frequency.setValueAtTime(330, now + 0.15);
+  osc.type = 'square';
+  gain.gain.setValueAtTime(0.1, now);
+  gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+  
+  osc.start(now);
+  osc.stop(now + 0.3);
+}
 
 function setInputDisabled(v) {
   userInput.disabled = v;
@@ -1112,10 +1208,12 @@ async function sendMessage() {
       errDiv.setAttribute('role', 'alert');
       errDiv.textContent = 'Error: ' + data.error;
       messagesEl.appendChild(errDiv);
+      playAlertSound();
     } else {
       const assistantMsg = { role: 'assistant', content: data.reply, _sources: data.sources };
       history.push(assistantMsg);
       addMessageEl('assistant', data.reply, data.sources);
+      playResponseSound();
       
       if (data.thread_id && data.thread_id !== currentThreadId) {
         currentThreadId = data.thread_id;
@@ -1130,6 +1228,7 @@ async function sendMessage() {
     errDiv.setAttribute('role', 'alert');
     errDiv.textContent = 'Network error. Is the server running?';
     messagesEl.appendChild(errDiv);
+    playAlertSound();
   } finally {
     setInputDisabled(false);
     userInput.focus();
@@ -1226,6 +1325,7 @@ reindexBtn.addEventListener('click', async () => {
       await loadProjectStatus(currentProjectId);
       reindexBtn.disabled = false;
       setStatus('');
+      playIndexSound();
     }, 6000);
   } catch {
     setStatus('Re-index request failed.');
@@ -1294,9 +1394,11 @@ fileInput.addEventListener('change', async () => {
     setTimeout(() => {
       uploadStatus.textContent = '';
       loadProjectStatus(currentProjectId);
+      playIndexSound();
     }, 1500);
   } else if (failCount > 0) {
     uploadStatus.textContent = `Failed to upload ${failCount} file(s).`;
+    playAlertSound();
   }
 });
 
@@ -1311,6 +1413,7 @@ reindexFilesBtn.addEventListener('click', reindexSelectedFiles);
 let currentThreadId = null;
 let threadList = [];
 let showingAllThreads = false;
+window.soundEnabled = true;
 
 async function loadThreads(showAll = false) {
   if (!currentProjectId) return;
@@ -1631,6 +1734,8 @@ async function openSettings(mode) {
   document.getElementById('s-topk').value = d.top_k_results || '';
   document.getElementById('s-history-turns').value = d.max_history_turns || '';
   document.getElementById('s-threads-display').value = d.max_threads_display || '';
+  document.getElementById('s-sound-enabled').checked = d.sound_enabled !== false;
+  window.soundEnabled = d.sound_enabled !== false;
   document.getElementById('s-system').value = d.system_prompt || '';
 
   if (mode === 'project' && currentProjectId) {
@@ -1680,8 +1785,11 @@ document.getElementById('settings-save-btn').addEventListener('click', async () 
     top_k_results: document.getElementById('s-topk').value,
     max_history_turns: document.getElementById('s-history-turns').value,
     max_threads_display: document.getElementById('s-threads-display').value,
+    sound_enabled: document.getElementById('s-sound-enabled').checked,
     system_prompt: document.getElementById('s-system').value,
   };
+  
+  window.soundEnabled = document.getElementById('s-sound-enabled').checked;
   
   const chatKey = document.getElementById('s-chat-api-key').value.trim();
   if (chatKey) payload.chat_api_key = chatKey;
