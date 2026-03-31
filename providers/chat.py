@@ -46,6 +46,8 @@ def chat_openrouter(messages: list, model: str, api_key: str, base_url: str = No
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
+        "HTTP-Referer": "https://aiallylight.app",
+        "X-Title": "AI Ally Light",
     }
     payload = {
         "model": model,
