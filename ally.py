@@ -55,9 +55,9 @@ PROJECTS_DIR.mkdir(exist_ok=True)
 # ── Config ────────────────────────────────────────────────────────────────────
 DEFAULT_CONFIG = {
     "chat_provider": os.getenv("CHAT_PROVIDER", "openrouter"),
-    "chat_api_key": os.getenv("CHAT_API_KEY", ""),
+    "chat_api_key": "",
     "chat_model": os.getenv("CHAT_MODEL", "openai/gpt-4o-mini"),
-    "chat_base_url": os.getenv("CHAT_BASE_URL", ""),
+    "chat_base_url": os.getenv("CHAT_BASE_URL", "https://openrouter.ai/api/v1"),
     
     "embed_provider": os.getenv("EMBED_PROVIDER", "ollama"),
     "embed_api_key": os.getenv("EMBED_API_KEY", ""),
@@ -85,11 +85,17 @@ def load_config() -> dict:
     # Ensure all default keys are present, even if not in the file
     for k, v in DEFAULT_CONFIG.items():
         cfg.setdefault(k, v)
+    cfg["chat_api_key"] = os.getenv("CHAT_API_KEY", "")
+    cfg["embed_api_key"] = os.getenv("EMBED_API_KEY", "")
     return cfg
 
 def save_config(cfg: dict):
-    CONFIG_FILE.write_text(json.dumps(cfg, indent=2))
-
+    # Create a copy so we don't accidentally modify the running config
+    save_data = cfg.copy()
+    # Remove sensitive keys before writing to config.json
+    save_data.pop("chat_api_key", None)
+    save_data.pop("embed_api_key", None)
+    CONFIG_FILE.write_text(json.dumps(save_data, indent=2))
 config = load_config()
 
 # ── Per-project config ────────────────────────────────────────────────────────
