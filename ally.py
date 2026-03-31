@@ -6,7 +6,7 @@ Requirements:
 
 Usage:
     1. Run: python ally.py
-    2. Open http://localhost:5000 in your browser.
+    2. Open http://localhost:5000 in your browser. (This should happen automatically)
     3. Create projects and manage everything from the UI.
 """
 
@@ -21,7 +21,8 @@ from datetime import datetime
 
 from dotenv import load_dotenv
 
-load_dotenv()
+from pathlib import Path
+load_dotenv(dotenv_path=Path(__file__).parent / ".env")
 
 import requests
 from flask import Flask, request, jsonify, send_from_directory
@@ -34,6 +35,10 @@ from watchdog.events import FileSystemEventHandler
 from providers import chat as chat_providers
 from providers.embeddings import get_embedding as provider_get_embedding
 from providers.embeddings import check_provider_connection
+
+import certifi
+import os
+os.environ['REQUESTS_CA_BUNDLE'] = certifi.where()
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
