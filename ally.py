@@ -94,7 +94,7 @@ config = load_config()
 
 # ── Per-project config ────────────────────────────────────────────────────────
 # Keys that can be overridden per project
-PROJECT_OVERRIDABLE = ["openrouter_model", "top_k_results", "system_prompt"]
+PROJECT_OVERRIDABLE = ["chat_model", "top_k_results", "system_prompt"]
 
 def project_config_file(pid: str) -> Path:
     return PROJECTS_DIR / pid / "config.json"
@@ -1101,7 +1101,7 @@ def api_chat(pid):
         "reply": reply,
         "sources": sources,
         "thread_id": thread_id,
-        "model": cfg["openrouter_model"]
+        "model": cfg["chat_model"]
     })
 
 # ── Startup ───────────────────────────────────────────────────────────────────
