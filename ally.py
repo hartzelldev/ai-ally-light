@@ -563,18 +563,6 @@ def get_project_index_status(pid: str) -> dict:
     
     return {"chunk_count": count, "indexed_files": indexed_files}
 
-@app.route("/api/ally/projects/<pid>/model")
-def api_project_model(pid):
-    if pid not in load_projects():
-        return jsonify({"error": "Project not found."}), 404
-    cfg = effective_config(pid)
-    return jsonify({
-        "chat_provider": cfg.get("chat_provider", "openrouter"),
-        "chat_model": cfg.get("chat_model", "openai/gpt-4o-mini"),
-        "embed_provider": cfg.get("embed_provider", "ollama"),
-        "embed_model": cfg.get("embed_model", "nomic-embed-text"),
-    })
-
 def delete_file_from_index(pid: str, filename: str):
     """Remove a file's chunks from the index."""
     col = get_collection(pid)
@@ -969,6 +957,18 @@ def api_project_status(pid):
     if pid not in load_projects():
         return jsonify({"error": "Project not found."}), 404
     return jsonify(get_project_index_status(pid))
+
+@app.route("/api/ally/projects/<pid>/model")
+def api_project_model(pid):
+    if pid not in load_projects():
+        return jsonify({"error": "Project not found."}), 404
+    cfg = effective_config(pid)
+    return jsonify({
+        "chat_provider": cfg.get("chat_provider", "openrouter"),
+        "chat_model": cfg.get("chat_model", "openai/gpt-4o-mini"),
+        "embed_provider": cfg.get("embed_provider", "ollama"),
+        "embed_model": cfg.get("embed_model", "nomic-embed-text"),
+    })
 
 # Delete file from index
 @app.route("/api/ally/projects/<pid>/files", methods=["DELETE"])
