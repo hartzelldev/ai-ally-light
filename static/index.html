@@ -999,6 +999,14 @@ async function loadProjectStatus(pid) {
       }
     }
 
+    // Load project-specific model info
+    try {
+      const mr = await fetch(`/api/ally/projects/${pid}/model`);
+      const md = await mr.json();
+      modelInfo.textContent = 'LLM: ' + (md.chat_provider || 'unknown') + '/' + (md.chat_model || 'unknown');
+      embedInfo.textContent = 'Embed: ' + (md.embed_provider || 'unknown') + '/' + (md.embed_model || 'unknown');
+    } catch { /* ignore model fetch errors */ }
+
     // Session info
     document.getElementById('session-id-display').textContent = 'Today: ' + currentSessionId;
 
