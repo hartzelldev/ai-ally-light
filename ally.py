@@ -70,6 +70,10 @@ DEFAULT_CONFIG = {
     "max_history_turns": 20,
     "max_threads_display": 10,
     "sound_enabled": True,
+    "temperature": 0.8,
+    "min_p": 0.05,
+    "top_p": 1.0,
+    "max_tokens": 4096,
     "system_prompt": (
         "You are a helpful assistant. Answer questions using the provided context. "
         "If the context doesn't contain relevant information, say so and answer "
@@ -100,7 +104,7 @@ config = load_config()
 
 # ── Per-project config ────────────────────────────────────────────────────────
 # Keys that can be overridden per project
-PROJECT_OVERRIDABLE = ["chat_model", "top_k_results", "system_prompt"]
+PROJECT_OVERRIDABLE = ["chat_model", "top_k_results", "system_prompt", "temperature", "min_p", "top_p", "max_tokens"]
 
 def project_config_file(pid: str) -> Path:
     return PROJECTS_DIR / pid / "config.json"
@@ -683,6 +687,12 @@ def chat_with_llm(messages: list, context_chunks: list, cfg: dict) -> str:
     model = cfg.get("chat_model", "openai/gpt-4o-mini")
     api_key = cfg.get("chat_api_key", "")
     base_url = cfg.get("chat_base_url", "")
+    sampling_params = {
+        "temperature": float(cfg.get("temperature", 0.8)),
+        "min_p": float(cfg.get("min_p", 0.05)),
+        "top_p": float(cfg.get("top_p", 1.0)),
+        "max_tokens": int(cfg.get("max_tokens", 4096)),
+    }
     
     if chat_providers.CHAT_PROVIDERS.get(provider, {}).get("requires_api_key", True) and not api_key:
         provider_name = chat_providers.CHAT_PROVIDERS.get(provider, {}).get("name", provider)
@@ -700,7 +710,7 @@ def chat_with_llm(messages: list, context_chunks: list, cfg: dict) -> str:
     full_messages = [{"role": "system", "content": system}] + messages
 
     try:
-        return chat_providers.chat_with_provider(provider, full_messages, model, api_key, base_url or None)
+        return chat_providers.chat_with_provider(provider, full_messages, model, api_key, base_url or None, sampling_params)
     except requests.HTTPError as e:
         try:
             detail = e.response.json()
@@ -779,7 +789,8 @@ def api_save_settings():
     data = request.json
     
     env_keys_to_save = {}
-    int_keys = ("chunk_size", "chunk_overlap", "top_k_results", "max_history_turns", "max_threads_display")
+    int_keys = ("chunk_size", "chunk_overlap", "top_k_results", "max_history_turns", "max_threads_display", "max_tokens")
+    float_keys = ("temperature", "min_p", "top_p")
     
     for old_key, env_key in ENV_KEYS.items():
         if old_key in data and str(data[old_key]).strip() != "":
@@ -789,7 +800,7 @@ def api_save_settings():
     for key in env_keys_to_save:
         save_to_env(key, env_keys_to_save[key])
     
-    editable = ["chunk_size", "chunk_overlap", "top_k_results", "max_history_turns", "max_threads_display", "system_prompt"]
+    editable = ["chunk_size", "chunk_overlap", "top_k_results", "max_history_turns", "max_threads_display", "max_tokens", "system_prompt"]
     for key in editable:
         if key in data and str(data[key]).strip() != "":
             val = data[key]
@@ -799,6 +810,13 @@ def api_save_settings():
                 except ValueError:
                     continue
             config[key] = val
+    
+    for key in float_keys:
+        if key in data and str(data[key]).strip() != "":
+            try:
+                config[key] = float(data[key])
+            except ValueError:
+                pass
     
     if "sound_enabled" in data:
         config["sound_enabled"] = bool(data["sound_enabled"])
@@ -831,7 +849,12 @@ def api_save_project_settings(pid):
             if val is None or str(val).strip() == "":
                 overrides.pop(key, None)
             else:
-                if key == "top_k_results":
+                if key in ("temperature", "min_p", "top_p"):
+                    try:
+                        val = float(val)
+                    except ValueError:
+                        continue
+                elif key in ("top_k_results", "max_tokens"):
                     try:
                         val = int(val)
                     except ValueError:

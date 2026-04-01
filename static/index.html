@@ -626,6 +626,101 @@
       </div>
     </fieldset>
     
+    <!-- Sampling Settings -->
+    <fieldset style="border:1px solid var(--border);border-radius:4px;padding:1rem;margin-bottom:1rem;">
+      <legend style="font-weight:bold;padding:0 0.5rem;">Sampling</legend>
+      
+      <div class="field">
+        <label for="s-temperature">Temperature</label>
+        <select id="s-temperature" style="width:100%;padding:0.4rem;">
+          <option value="0.0">0.0 — Deterministic</option>
+          <option value="0.1">0.1</option>
+          <option value="0.2">0.2</option>
+          <option value="0.3">0.3</option>
+          <option value="0.4">0.4</option>
+          <option value="0.5">0.5</option>
+          <option value="0.6">0.6</option>
+          <option value="0.7">0.7</option>
+          <option value="0.8">0.8 — Default</option>
+          <option value="0.9">0.9</option>
+          <option value="1.0">1.0</option>
+          <option value="1.1">1.1</option>
+          <option value="1.2">1.2</option>
+          <option value="1.3">1.3</option>
+          <option value="1.4">1.4</option>
+          <option value="1.5">1.5</option>
+          <option value="1.6">1.6</option>
+          <option value="1.7">1.7</option>
+          <option value="1.8">1.8</option>
+          <option value="1.9">1.9</option>
+          <option value="2.0">2.0 — Maximum randomness</option>
+        </select>
+        <small>Controls response creativity. Lower = focused, higher = creative.</small>
+      </div>
+      
+      <div class="field">
+        <label for="s-min-p">Min P</label>
+        <select id="s-min-p" style="width:100%;padding:0.4rem;">
+          <option value="0.0">0.0</option>
+          <option value="0.05">0.05 — Default</option>
+          <option value="0.1">0.1</option>
+          <option value="0.15">0.15</option>
+          <option value="0.2">0.2</option>
+          <option value="0.25">0.25</option>
+          <option value="0.3">0.3</option>
+          <option value="0.35">0.35</option>
+          <option value="0.4">0.4</option>
+          <option value="0.45">0.45</option>
+          <option value="0.5">0.5</option>
+          <option value="0.55">0.55</option>
+          <option value="0.6">0.6</option>
+          <option value="0.65">0.65</option>
+          <option value="0.7">0.7</option>
+          <option value="0.75">0.75</option>
+          <option value="0.8">0.8</option>
+          <option value="0.85">0.85</option>
+          <option value="0.9">0.9</option>
+          <option value="0.95">0.95</option>
+          <option value="1.0">1.0</option>
+        </select>
+        <small>Minimum token probability threshold. Higher = more focused.</small>
+      </div>
+      
+      <div class="field">
+        <label for="s-top-p">Top P</label>
+        <select id="s-top-p" style="width:100%;padding:0.4rem;">
+          <option value="0.0">0.0</option>
+          <option value="0.05">0.05</option>
+          <option value="0.1">0.1</option>
+          <option value="0.15">0.15</option>
+          <option value="0.2">0.2</option>
+          <option value="0.25">0.25</option>
+          <option value="0.3">0.3</option>
+          <option value="0.35">0.35</option>
+          <option value="0.4">0.4</option>
+          <option value="0.45">0.45</option>
+          <option value="0.5">0.5</option>
+          <option value="0.55">0.55</option>
+          <option value="0.6">0.6</option>
+          <option value="0.65">0.65</option>
+          <option value="0.7">0.7</option>
+          <option value="0.75">0.75</option>
+          <option value="0.8">0.8</option>
+          <option value="0.85">0.85</option>
+          <option value="0.9">0.9</option>
+          <option value="0.95">0.95</option>
+          <option value="1.0">1.0 — Default</option>
+        </select>
+        <small>Nucleus sampling. Cumulative probability cutoff for token selection.</small>
+      </div>
+      
+      <div class="field">
+        <label for="s-max-tokens">Max Tokens</label>
+        <input type="text" id="s-max-tokens" placeholder="4096" />
+        <small>Maximum response length in tokens</small>
+      </div>
+    </fieldset>
+    
     <div class="field">
       <label for="s-chunk-size">Chunk Size (words)</label>
       <input type="text" id="s-chunk-size" />
@@ -679,6 +774,95 @@
       <label for="ps-system">System Prompt</label>
       <textarea id="ps-system" placeholder="Leave blank to use global default"></textarea>
       <small id="ps-system-hint"></small>
+    </div>
+    <div class="field">
+      <label for="ps-temperature">Temperature</label>
+      <select id="ps-temperature" style="width:100%;padding:0.4rem;">
+        <option value="">Use global default</option>
+        <option value="0.0">0.0</option>
+        <option value="0.1">0.1</option>
+        <option value="0.2">0.2</option>
+        <option value="0.3">0.3</option>
+        <option value="0.4">0.4</option>
+        <option value="0.5">0.5</option>
+        <option value="0.6">0.6</option>
+        <option value="0.7">0.7</option>
+        <option value="0.8">0.8</option>
+        <option value="0.9">0.9</option>
+        <option value="1.0">1.0</option>
+        <option value="1.1">1.1</option>
+        <option value="1.2">1.2</option>
+        <option value="1.3">1.3</option>
+        <option value="1.4">1.4</option>
+        <option value="1.5">1.5</option>
+        <option value="1.6">1.6</option>
+        <option value="1.7">1.7</option>
+        <option value="1.8">1.8</option>
+        <option value="1.9">1.9</option>
+        <option value="2.0">2.0</option>
+      </select>
+      <small id="ps-temperature-hint"></small>
+    </div>
+    <div class="field">
+      <label for="ps-min-p">Min P</label>
+      <select id="ps-min-p" style="width:100%;padding:0.4rem;">
+        <option value="">Use global default</option>
+        <option value="0.0">0.0</option>
+        <option value="0.05">0.05</option>
+        <option value="0.1">0.1</option>
+        <option value="0.15">0.15</option>
+        <option value="0.2">0.2</option>
+        <option value="0.25">0.25</option>
+        <option value="0.3">0.3</option>
+        <option value="0.35">0.35</option>
+        <option value="0.4">0.4</option>
+        <option value="0.45">0.45</option>
+        <option value="0.5">0.5</option>
+        <option value="0.55">0.55</option>
+        <option value="0.6">0.6</option>
+        <option value="0.65">0.65</option>
+        <option value="0.7">0.7</option>
+        <option value="0.75">0.75</option>
+        <option value="0.8">0.8</option>
+        <option value="0.85">0.85</option>
+        <option value="0.9">0.9</option>
+        <option value="0.95">0.95</option>
+        <option value="1.0">1.0</option>
+      </select>
+      <small id="ps-min-p-hint"></small>
+    </div>
+    <div class="field">
+      <label for="ps-top-p">Top P</label>
+      <select id="ps-top-p" style="width:100%;padding:0.4rem;">
+        <option value="">Use global default</option>
+        <option value="0.0">0.0</option>
+        <option value="0.05">0.05</option>
+        <option value="0.1">0.1</option>
+        <option value="0.15">0.15</option>
+        <option value="0.2">0.2</option>
+        <option value="0.25">0.25</option>
+        <option value="0.3">0.3</option>
+        <option value="0.35">0.35</option>
+        <option value="0.4">0.4</option>
+        <option value="0.45">0.45</option>
+        <option value="0.5">0.5</option>
+        <option value="0.55">0.55</option>
+        <option value="0.6">0.6</option>
+        <option value="0.65">0.65</option>
+        <option value="0.7">0.7</option>
+        <option value="0.75">0.75</option>
+        <option value="0.8">0.8</option>
+        <option value="0.85">0.85</option>
+        <option value="0.9">0.9</option>
+        <option value="0.95">0.95</option>
+        <option value="1.0">1.0</option>
+      </select>
+      <small id="ps-top-p-hint"></small>
+    </div>
+    <div class="field">
+      <label for="ps-max-tokens">Max Tokens</label>
+      <input type="text" id="ps-max-tokens" placeholder="Leave blank to use global default" />
+      <small id="ps-max-tokens-hint"></small>
     </div>
   </div>
 
@@ -1737,6 +1921,11 @@ async function openSettings(mode) {
   updateChatFields();
   updateEmbedFields();
   
+  document.getElementById('s-temperature').value = d.temperature != null ? String(d.temperature) : '0.8';
+  document.getElementById('s-min-p').value = d.min_p != null ? String(d.min_p) : '0.05';
+  document.getElementById('s-top-p').value = d.top_p != null ? String(d.top_p) : '1.0';
+  document.getElementById('s-max-tokens').value = d.max_tokens || '';
+  
   document.getElementById('s-chunk-size').value = d.chunk_size || '';
   document.getElementById('s-overlap').value = d.chunk_overlap || '';
   document.getElementById('s-topk').value = d.top_k_results || '';
@@ -1765,6 +1954,18 @@ async function openSettings(mode) {
     document.getElementById('ps-system').value = ov.system_prompt || '';
     document.getElementById('ps-system-hint').textContent =
       ov.system_prompt ? 'Currently overriding global.' : 'Currently using global default.';
+    
+    document.getElementById('ps-temperature').value = ov.temperature != null ? String(ov.temperature) : '';
+    document.getElementById('ps-temperature-hint').textContent = `Global default: ${gl.temperature ?? '—'}`;
+    
+    document.getElementById('ps-min-p').value = ov.min_p != null ? String(ov.min_p) : '';
+    document.getElementById('ps-min-p-hint').textContent = `Global default: ${gl.min_p ?? '—'}`;
+    
+    document.getElementById('ps-top-p').value = ov.top_p != null ? String(ov.top_p) : '';
+    document.getElementById('ps-top-p-hint').textContent = `Global default: ${gl.top_p ?? '—'}`;
+    
+    document.getElementById('ps-max-tokens').value = ov.max_tokens != null ? String(ov.max_tokens) : '';
+    document.getElementById('ps-max-tokens-hint').textContent = `Global default: ${gl.max_tokens ?? '—'}`;
   }
 
   settingsDialog.showModal();
@@ -1788,6 +1989,10 @@ document.getElementById('settings-save-btn').addEventListener('click', async () 
     embed_provider: document.getElementById('s-embed-provider').value,
     embed_base_url: document.getElementById('s-embed-base-url').value,
     embed_model: document.getElementById('s-embed-model').value,
+    temperature: document.getElementById('s-temperature').value,
+    min_p: document.getElementById('s-min-p').value,
+    top_p: document.getElementById('s-top-p').value,
+    max_tokens: document.getElementById('s-max-tokens').value,
     chunk_size: document.getElementById('s-chunk-size').value,
     chunk_overlap: document.getElementById('s-overlap').value,
     top_k_results: document.getElementById('s-topk').value,
@@ -1819,6 +2024,10 @@ document.getElementById('settings-save-btn').addEventListener('click', async () 
       chat_model: document.getElementById('ps-model').value.trim() || null,
       top_k_results:    document.getElementById('ps-topk').value.trim() || null,
       system_prompt:    document.getElementById('ps-system').value.trim() || null,
+      temperature: document.getElementById('ps-temperature').value || null,
+      min_p: document.getElementById('ps-min-p').value || null,
+      top_p: document.getElementById('ps-top-p').value || null,
+      max_tokens: document.getElementById('ps-max-tokens').value.trim() || null,
     };
     await fetch(`/api/ally/projects/${currentProjectId}/settings`, {
       method: 'POST',
