@@ -1748,8 +1748,8 @@ async function openSettings(mode) {
     const ov = pd.overrides || {};
     const gl = pd.global || {};
 
-    document.getElementById('ps-model').value = ov.openrouter_model || '';
-    document.getElementById('ps-model-hint').textContent = `Global default: ${gl.openrouter_model || '—'}`;
+    document.getElementById('ps-model').value = ov.chat_model || '';
+    document.getElementById('ps-model-hint').textContent = `Global default: ${gl.chat_model || '—'}`;
 
     document.getElementById('ps-topk').value = ov.top_k_results != null ? ov.top_k_results : '';
     document.getElementById('ps-topk-hint').textContent = `Global default: ${gl.top_k_results || '—'}`;
@@ -1808,7 +1808,7 @@ document.getElementById('settings-save-btn').addEventListener('click', async () 
   // Save project overrides only if in project mode and a project is selected
   if (settingsMode === 'project' && currentProjectId && !document.getElementById('project-settings-section').hidden) {
     const projPayload = {
-      openrouter_model: document.getElementById('ps-model').value.trim() || null,
+      chat_model: document.getElementById('ps-model').value.trim() || null,
       top_k_results:    document.getElementById('ps-topk').value.trim() || null,
       system_prompt:    document.getElementById('ps-system').value.trim() || null,
     };
