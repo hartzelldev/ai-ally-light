@@ -40,6 +40,8 @@ secrets.json
 config.json
 .opencode/
 .opencode.json
+opencode.json
+agents.md
 
 # App specific
 projects/
