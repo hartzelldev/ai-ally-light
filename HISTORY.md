@@ -1,6 +1,18 @@
 # AI Ally Light - Development History
 
-## v0.3 (2026-03-30)
+## v0.4 Alpha (2026-04-06)
+
+### Features
+- **Intelligent Browser Dispatcher:** Implemented a platform-aware browser launcher.
+- **Dynamic Port Management:** Replaced static port binding with a randomized port allocation strategy
+
+### Technical
+- **Flask Blueprint Migration:** Transitioned the application from a single-file structure to a modular Blueprint architecture. Moved all core application routes into routes/main.py to improve maintainability and separation of concerns.
+- **Circular Import Resolution:** Optimized the package initialization pattern (create_app) to resolve complex circular dependency issues between the main application entry point and the new route modules.
+
+---
+
+## v0.3 Alpha (2026-03-30)
 
 ### Features
 - **Audio Notifications**: Sound alerts for AI responses, indexing completion, and errors
@@ -15,7 +27,7 @@
 
 ---
 
-## v0.2 (2026-03-28)
+## v0.2 Alpha (2026-03-28)
 
 ### Features
 - **Multi-Provider LLM Support**: Chat with OpenRouter, Groq, TogetherAI, Ollama, or custom providers
