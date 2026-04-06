@@ -10,18 +10,22 @@ Usage:
     3. Create projects and manage everything from the UI.
 """
 
+import sys
 import json
 import os
 import re
 import shutil
 import hashlib
 import logging
+log = logging.getLogger(__name__)
 import socket
 import threading
 import time
+import subprocess
 import webbrowser
 from pathlib import Path
 from datetime import datetime
+import random
 
 from dotenv import load_dotenv
 
@@ -714,36 +718,79 @@ def create_app() -> Flask:
 
     return app
 
-# ── Port helpers ──────────────────────────────────────────────────────────────
-def find_free_port(start_port, end_port):
-    for port in range(start_port, end_port + 1):
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            if s.connect_ex(('localhost', port)) != 0:
-                return port
-    return None
+# ── Port and Browser Helpers ──────────────────────────────────────────────────
 
-def open_browser(port):
+def get_random_port(start=5001, end=5015):
+    """Pick a random port, similar to the SlamSim logic."""
+    return random.randint(start, end)
+
+def open_browser_smart(port):
+    """
+    OS-aware browser launcher. 
+    Uses wslview if in WSL, otherwise falls back to standard webbrowser.
+    """
+    # Give the Flask server a moment to initialize
     time.sleep(1.5)
-    url = f"http://localhost:{port}"
+    url = f"http://localhost:{port}/"
+    
     print(f"--- Opening AI Ally Light at {url} ---")
-    webbrowser.open(url)
+
+    if sys.platform == "win32" or sys.platform == "darwin":
+        # Windows or macOS
+        webbrowser.open_new_tab(url)
+    elif sys.platform.startswith("linux"):
+        # Check for WSL environment variables
+        is_wsl = "WSL_DISTRO_NAME" in os.environ or "WSL_LAUNCH_GUID" in os.environ
+        if is_wsl:
+            try:
+                # Use wslview to bridge to the Windows host browser
+                subprocess.run(["wslview", url], check=True)
+            except (FileNotFoundError, subprocess.CalledProcessError):
+                log.error("wslview failed. Please open the URL manually.")
+                print(f"Please open your browser to: {url}")
+        else:
+            # Standard Linux
+            webbrowser.open_new_tab(url)
+    else:
+        print(f"Unsupported platform. Please navigate to: {url}")
 
 # ── Entry point ───────────────────────────────────────────────────────────────
+
 if __name__ == "__main__":
+    # 1. Initialize background tasks
     for pid in load_projects():
         start_watcher(pid)
+    
     ollama_ok, msg = check_ollama()
     log.info(msg)
+    
     if ollama_ok:
         for pid in load_projects():
             index_project(pid)
     else:
         log.warning("Skipping indexing — fix Ollama first, then Re-index from the UI.")
 
+    # 2. Setup Flask App
+    # create_app() should now be registering your Blueprints internally 
+    # to avoid the circular import issues 
     app = create_app()
 
-    target_port = find_free_port(5000, 5020) or 5000
-    threading.Thread(target=open_browser, args=(target_port,), daemon=True).start()
+    # 3. Determine Port and Launch Browser
+    target_port = get_random_port()
+    
+    # We use a daemon thread so the browser trigger doesn't block the Flask server
+    threading.Thread(
+        target=open_browser_smart, 
+        args=(target_port,), 
+        daemon=True
+    ).start()
 
     log.info(f"AI Ally Light running at http://localhost:{target_port}")
-    app.run(host="127.0.0.1", port=target_port, debug=False)
+    
+    # 4. Start the Server
+    try:
+        # Binding to 127.0.0.1 is standard for local dev
+        app.run(host="127.0.0.1", port=target_port, debug=False)
+    except KeyboardInterrupt:
+        log.info("Ctrl+C detected. Shutting down AI Ally Light...")
+        
