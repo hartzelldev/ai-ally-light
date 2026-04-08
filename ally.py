@@ -764,11 +764,6 @@ if __name__ == "__main__":
     ollama_ok, msg = check_ollama()
     log.info(msg)
     
-    if ollama_ok:
-        for pid in load_projects():
-            index_project(pid)
-    else:
-        log.warning("Skipping indexing — fix Ollama first, then Re-index from the UI.")
 
     # 2. Setup Flask App
     # create_app() should now be registering your Blueprints internally 
