@@ -139,7 +139,7 @@ def save_to_env(key: str, value: str):
     env_path.write_text("\n".join(lines) + "\n")
 
 # ── Per-project config ────────────────────────────────────────────────────────
-PROJECT_OVERRIDABLE = ["chat_model", "top_k_results", "system_prompt", "temperature", "min_p", "top_p", "max_tokens"]
+PROJECT_OVERRIDABLE = ["chat_model", "top_k_results", "system_prompt", "temperature", "min_p", "top_p", "max_tokens", "chunk_size", "chunk_overlap"]
 
 def project_config_file(pid: str) -> Path:
     return PROJECTS_DIR / pid / "config.json"
