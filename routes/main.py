@@ -33,13 +33,8 @@ from ally import (
 
 bp = Blueprint('main', __name__)
 
-# Root route
-@bp.route("/")
-def index():
-    return send_from_directory("static", "index.html")
-
 # System status
-@bp.route("/api/ally/status")
+@bp.route("/status")
 def api_status():
     ollama_ok, ollama_msg = check_ollama()
     return jsonify({
@@ -53,7 +48,7 @@ def api_status():
     })
 
 # Settings
-@bp.route("/api/ally/settings", methods=["GET"])
+@bp.route("/settings", methods=["GET"])
 def api_get_settings():
     safe = dict(config)
     chat_key = safe.get("chat_api_key", "")
@@ -62,7 +57,7 @@ def api_get_settings():
     safe["embed_api_key"] = ""
     return jsonify(safe)
 
-@bp.route("/api/ally/settings", methods=["POST"])
+@bp.route("/settings", methods=["POST"])
 def api_save_settings():
     data = request.json
 
@@ -104,7 +99,7 @@ def api_save_settings():
     return jsonify({"success": True})
 
 # Project settings (overrides only)
-@bp.route("/api/ally/projects/<pid>/settings", methods=["GET"])
+@bp.route("/ally/projects/<pid>/settings", methods=["GET"])
 def api_get_project_settings(pid):
     if pid not in load_projects():
         return jsonify({"error": "Project not found."}), 404
@@ -116,7 +111,7 @@ def api_get_project_settings(pid):
         "global": {k: config.get(k) for k in PROJECT_OVERRIDABLE},
     })
 
-@bp.route("/api/ally/projects/<pid>/settings", methods=["POST"])
+@bp.route("/ally/projects/<pid>/settings", methods=["POST"])
 def api_save_project_settings(pid):
     if pid not in load_projects():
         return jsonify({"error": "Project not found."}), 404
@@ -143,7 +138,7 @@ def api_save_project_settings(pid):
     return jsonify({"success": True})
 
 # Projects list
-@bp.route("/api/ally/projects", methods=["GET"])
+@bp.route("/projects", methods=["GET"])
 def api_list_projects():
     projects = load_projects()
     return jsonify([
@@ -157,7 +152,7 @@ def api_list_projects():
     ])
 
 # Create project
-@bp.route("/api/ally/projects", methods=["POST"])
+@bp.route("/projects", methods=["POST"])
 def api_create_project():
     data = request.json
     name = (data.get("name") or "").strip()
@@ -179,7 +174,7 @@ def api_create_project():
     log.info(f"Created project '{name}' ({pid})")
     return jsonify({"id": pid, "name": name, "docs_folder": str(project_docs_dir(pid))})
 
-@bp.route("/api/ally/projects/<pid>/upload", methods=["POST"])
+@bp.route("/ally/projects/<pid>/upload", methods=["POST"])
 def api_upload_document(pid):
     if pid not in load_projects():
         return jsonify({"error": "Project not found."}), 404
@@ -212,7 +207,7 @@ def api_upload_document(pid):
         return jsonify({"error": str(e)}), 500
 
 # Rename project
-@bp.route("/api/ally/projects/<pid>", methods=["PUT"])
+@bp.route("/ally/projects/<pid>", methods=["PUT"])
 def api_rename_project(pid):
     projects = load_projects()
     if pid not in projects:
@@ -225,7 +220,7 @@ def api_rename_project(pid):
     return jsonify({"success": True})
 
 # Delete project
-@bp.route("/api/ally/projects/<pid>", methods=["DELETE"])
+@bp.route("/ally/projects/<pid>", methods=["DELETE"])
 def api_delete_project(pid):
     projects = load_projects()
     if pid not in projects:
@@ -241,13 +236,13 @@ def api_delete_project(pid):
     return jsonify({"success": True})
 
 # Project index status
-@bp.route("/api/ally/projects/<pid>/status")
+@bp.route("/ally/projects/<pid>/status")
 def api_project_status(pid):
     if pid not in load_projects():
         return jsonify({"error": "Project not found."}), 404
     return jsonify(get_project_index_status(pid))
 
-@bp.route("/api/ally/projects/<pid>/model")
+@bp.route("/ally/projects/<pid>/model")
 def api_project_model(pid):
     if pid not in load_projects():
         return jsonify({"error": "Project not found."}), 404
@@ -260,7 +255,7 @@ def api_project_model(pid):
     })
 
 # Delete file from index
-@bp.route("/api/ally/projects/<pid>/files", methods=["DELETE"])
+@bp.route("/ally/projects/<pid>/files", methods=["DELETE"])
 def api_delete_files(pid):
     if pid not in load_projects():
         return jsonify({"error": "Project not found."}), 404
@@ -272,7 +267,7 @@ def api_delete_files(pid):
     return jsonify({"success": True, "deleted": deleted})
 
 # Re-index files
-@bp.route("/api/ally/projects/<pid>/files/reindex", methods=["POST"])
+@bp.route("/ally/projects/<pid>/files/reindex", methods=["POST"])
 def api_reindex_files(pid):
     if pid not in load_projects():
         return jsonify({"error": "Project not found."}), 404
@@ -284,7 +279,7 @@ def api_reindex_files(pid):
     return jsonify({"success": True, "reindexed": reindexed})
 
 # Re-index project
-@bp.route("/api/ally/projects/<pid>/reindex", methods=["POST"])
+@bp.route("/ally/projects/<pid>/reindex", methods=["POST"])
 def api_reindex(pid):
     if pid not in load_projects():
         return jsonify({"error": "Project not found."}), 404
@@ -296,7 +291,7 @@ def api_reindex(pid):
     return jsonify({"success": True, "message": "Re-indexing started."})
 
 # List logs for a project
-@bp.route("/api/ally/projects/<pid>/logs")
+@bp.route("/ally/projects/<pid>/logs")
 def api_list_logs(pid):
     if pid not in load_projects():
         return jsonify({"error": "Project not found."}), 404
@@ -309,7 +304,7 @@ def api_list_logs(pid):
 
 # ── Threads API ────────────────────────────────────────────────────────────────
 
-@bp.route("/api/ally/projects/<pid>/threads")
+@bp.route("/ally/projects/<pid>/threads")
 def api_list_threads(pid):
     if pid not in load_projects():
         return jsonify({"error": "Project not found."}), 404
@@ -322,7 +317,7 @@ def api_list_threads(pid):
 
     return jsonify({"threads": threads, "has_more": has_more, "max_display": max_display})
 
-@bp.route("/api/ally/projects/<pid>/threads", methods=["POST"])
+@bp.route("/ally/projects/<pid>/threads", methods=["POST"])
 def api_create_thread(pid):
     if pid not in load_projects():
         return jsonify({"error": "Project not found."}), 404
@@ -330,7 +325,7 @@ def api_create_thread(pid):
     thread = create_thread(pid, data.get("name"))
     return jsonify(thread), 201
 
-@bp.route("/api/ally/projects/<pid>/threads/<tid>")
+@bp.route("/ally/projects/<pid>/threads/<tid>")
 def api_get_thread(pid, tid):
     if pid not in load_projects():
         return jsonify({"error": "Project not found."}), 404
@@ -347,7 +342,7 @@ def api_get_thread(pid, tid):
         "showing_messages": min(len(messages), max_turns)
     })
 
-@bp.route("/api/ally/projects/<pid>/threads/<tid>", methods=["PUT"])
+@bp.route("/ally/projects/<pid>/threads/<tid>", methods=["PUT"])
 def api_update_thread(pid, tid):
     if pid not in load_projects():
         return jsonify({"error": "Project not found."}), 404
@@ -358,7 +353,7 @@ def api_update_thread(pid, tid):
         return jsonify({"error": "Thread not found."}), 404
     return jsonify({"error": "No updates provided."}), 400
 
-@bp.route("/api/ally/projects/<pid>/threads/<tid>", methods=["DELETE"])
+@bp.route("/ally/projects/<pid>/threads/<tid>", methods=["DELETE"])
 def api_delete_thread(pid, tid):
     if pid not in load_projects():
         return jsonify({"error": "Project not found."}), 404
@@ -366,7 +361,7 @@ def api_delete_thread(pid, tid):
         return jsonify({"success": True})
     return jsonify({"error": "Thread not found."}), 404
 
-@bp.route("/api/ally/projects/<pid>/threads/batch-delete", methods=["POST"])
+@bp.route("/ally/projects/<pid>/threads/batch-delete", methods=["POST"])
 def api_delete_threads_batch(pid):
     if pid not in load_projects():
         return jsonify({"error": "Project not found."}), 404
@@ -378,7 +373,7 @@ def api_delete_threads_batch(pid):
     return jsonify({"success": True, "deleted": deleted})
 
 # Chat
-@bp.route("/api/ally/projects/<pid>/chat", methods=["POST"])
+@bp.route("/ally/projects/<pid>/chat", methods=["POST"])
 def api_chat(pid):
     if pid not in load_projects():
         return jsonify({"error": "Project not found."}), 404

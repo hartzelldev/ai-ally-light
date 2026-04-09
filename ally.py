@@ -35,7 +35,7 @@ import certifi
 os.environ['REQUESTS_CA_BUNDLE'] = certifi.where()
 
 import requests
-from flask import Flask
+from flask import Flask, send_from_directory
 from werkzeug.utils import secure_filename
 import chromadb
 from chromadb.config import Settings
@@ -139,7 +139,7 @@ def save_to_env(key: str, value: str):
     env_path.write_text("\n".join(lines) + "\n")
 
 # ── Per-project config ────────────────────────────────────────────────────────
-PROJECT_OVERRIDABLE = ["chat_model", "top_k_results", "system_prompt", "temperature", "min_p", "top_p", "max_tokens", "chunk_size", "chunk_overlap"]
+PROJECT_OVERRIDABLE = ["chat_model", "top_k_results", "system_prompt", "temperature", "min_p", "top_p", "max_tokens", "chunk_size", "chunk_overlap", "indexing_mode", "delimiter"]
 
 def project_config_file(pid: str) -> Path:
     return PROJECTS_DIR / pid / "config.json"
@@ -419,31 +419,84 @@ def get_chunk_position(total_chunks: int, chunk_index: int) -> str:
     return "middle"
 
 def chunk_text(text: str, path: Path = None) -> list:
-    size, overlap = config["chunk_size"], config["chunk_overlap"]
+    indexing_mode = config.get("indexing_mode", "standard")
+    delimiter = config.get("delimiter", "##")
 
-    sections = extract_sections(text) if (path and path.suffix.lower() == '.md') else []
+    if indexing_mode == "full_context":
+        return [{
+            "text": text,
+            "start_pos": 0,
+            "end_pos": len(text),
+            "section": None,
+            "section_level": 0
+        }]
+    elif indexing_mode == "delimiter":
+        chunks = []
+        parts = re.split(re.escape(delimiter), text)
+        current_pos = 0
+        for i, part in enumerate(parts):
+            part = part.strip()
+            if not part:
+                continue
+            start_pos = text.find(part, current_pos)
+            if start_pos == -1:
+                start_pos = current_pos  # Fallback if find fails
+            end_pos = start_pos + len(part)
+            chunks.append({
+                "text": part,
+                "start_pos": start_pos,
+                "end_pos": end_pos,
+                "section": None,
+                "section_level": 0
+            })
+            current_pos = end_pos
+        return chunks
+    else:
+        size, overlap = config["chunk_size"], config["chunk_overlap"]
 
-    sentences = split_into_sentences(text)
-    if not sentences:
-        return []
+        sections = extract_sections(text) if (path and path.suffix.lower() == '.md') else []
 
-    chunks = []
-    current_words = []
-    current_text = ""
-    chunk_start = 0
+        sentences = split_into_sentences(text)
+        if not sentences:
+            return []
 
-    for sentence in sentences:
-        sentence_words = sentence.split()
+        chunks = []
+        current_words = []
+        current_text = ""
+        chunk_start = 0
 
-        if not current_words:
-            chunk_start = text.find(sentence)
-            if chunk_start == -1:
-                chunk_start = 0
+        for sentence in sentences:
+            sentence_words = sentence.split()
 
-        current_words.extend(sentence_words)
-        current_text = " ".join(current_words)
+            if not current_words:
+                chunk_start = text.find(sentence)
+                if chunk_start == -1:
+                    chunk_start = 0
 
-        if len(current_words) >= size:
+            current_words.extend(sentence_words)
+            current_text = " ".join(current_words)
+
+            if len(current_words) >= size:
+                end_pos = chunk_start + len(current_text)
+                section, level = get_section_at_position(sections, chunk_start)
+                chunks.append({
+                    "text": current_text,
+                    "start_pos": chunk_start,
+                    "end_pos": end_pos,
+                    "section": section,
+                    "section_level": level
+                })
+
+                tail_words = current_words[-overlap:] if overlap > 0 else []
+                current_words = list(tail_words)
+                current_text = " ".join(current_words)
+
+                if tail_words:
+                    chunk_start = text.find(" ".join(tail_words), chunk_start + 1)
+                else:
+                    chunk_start = end_pos
+
+        if current_words:
             end_pos = chunk_start + len(current_text)
             section, level = get_section_at_position(sections, chunk_start)
             chunks.append({
@@ -454,27 +507,7 @@ def chunk_text(text: str, path: Path = None) -> list:
                 "section_level": level
             })
 
-            tail_words = current_words[-overlap:] if overlap > 0 else []
-            current_words = list(tail_words)
-            current_text = " ".join(current_words)
-
-            if tail_words:
-                chunk_start = text.find(" ".join(tail_words), chunk_start + 1)
-            else:
-                chunk_start = end_pos
-
-    if current_words:
-        end_pos = chunk_start + len(current_text)
-        section, level = get_section_at_position(sections, chunk_start)
-        chunks.append({
-            "text": current_text,
-            "start_pos": chunk_start,
-            "end_pos": end_pos,
-            "section": section,
-            "section_level": level
-        })
-
-    return chunks
+        return chunks
 
 def file_hash(path: Path) -> str:
     return hashlib.md5(path.read_bytes()).hexdigest()
@@ -508,7 +541,6 @@ def index_file(pid: str, path: Path):
     chunks = chunk_text(text, path)
     if not chunks:
         return
-
     document_title = extract_title(text, path.name)
     total_chunks = len(chunks)
     ids, embeddings, documents, metadatas = [], [], [], []
@@ -713,8 +745,12 @@ def create_app() -> Flask:
     """Create and configure the Flask app, registering all blueprints."""
     app = Flask(__name__, static_folder="static")
 
+    @app.route("/")
+    def index():
+        return send_from_directory("static", "index.html")
+
     from routes.main import bp
-    app.register_blueprint(bp)
+    app.register_blueprint(bp, url_prefix='/api')
 
     return app
 
@@ -771,7 +807,7 @@ if __name__ == "__main__":
     app = create_app()
 
     # 3. Determine Port and Launch Browser
-    target_port = get_random_port()
+    target_port = 5002
     
     # We use a daemon thread so the browser trigger doesn't block the Flask server
     threading.Thread(

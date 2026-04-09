@@ -42,6 +42,7 @@ config.json
 .opencode.json
 opencode.json
 agents.md
+.idea/
 
 # App specific
 projects/

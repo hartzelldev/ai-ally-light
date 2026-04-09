@@ -66,3 +66,4 @@ This project is designed to be fully navigable via keyboard and screen reader.
 ## Contact
 
 To reach the author, please create an **Issue** through the [GITHub repository](https://github.com/hartzelldev/ai-ally-light) or fill out [this contact form](https://hartzelldev.github.io/contact.html).
+                    
