@@ -5,440 +5,16 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>AI Ally Light</title>
+  <link rel="stylesheet" href="/static/styles.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    :root {
-      --bg: #1a1a1a;
-      --surface: #242424;
-      --surface2: #2c2c2c;
-      --border: #3a3a3a;
-      --text: #e8e8e8;
-      --text-dim: #999;
-      --accent: #4a9eff;
-      --accent-dim: #1a3a5c;
-      --success: #4caf82;
-      --warning: #e6a817;
-      --error: #e05555;
-      --user-bg: #1e2f45;
-      --font: Georgia, 'Times New Roman', serif;
-      --mono: 'Courier New', Courier, monospace;
-    }
-
-    body {
-      font-family: var(--font);
-      background: var(--bg);
-      color: var(--text);
-      font-size: 1rem;
-      line-height: 1.6;
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
-      overflow: hidden;
-    }
-
-    .skip-link {
-      position: absolute; left: -9999px; top: 0;
-      background: var(--accent); color: #fff;
-      padding: 0.5rem 1rem; z-index: 999;
-    }
-    .skip-link:focus { left: 0; }
-
-    /* ── Header ── */
-    header {
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      padding: 0.6rem 1rem;
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-      flex-shrink: 0;
-      flex-wrap: wrap;
-    }
-    header h1 { font-size: 1.1rem; font-weight: normal; white-space: nowrap; }
-
-    #system-status {
-      font-size: 0.8rem;
-      color: var(--text-dim);
-      margin-left: auto;
-    }
-    #system-status.ok  { color: var(--success); }
-    #system-status.warn { color: var(--warning); }
-    #system-status.err  { color: var(--error); }
-
-    /* ── Layout ── */
-    #app { display: flex; flex: 1; overflow: hidden; }
-
-    /* ── Left sidebar: projects ── */
-    #project-sidebar {
-      width: 220px;
-      flex-shrink: 0;
-      background: var(--surface);
-      border-right: 1px solid var(--border);
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-    }
-
-    #project-sidebar h2 {
-      font-size: 0.78rem;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--text-dim);
-      font-weight: normal;
-      padding: 0.75rem 0.75rem 0.4rem;
-    }
-
-    #project-list {
-      list-style: none;
-      overflow-y: auto;
-      flex: 1;
-    }
-
-    #project-list li { border-bottom: 1px solid var(--border); }
-
-    #project-list button.proj-btn {
-      width: 100%;
-      background: transparent;
-      border: none;
-      border-radius: 0;
-      color: var(--text);
-      padding: 0.6rem 0.75rem;
-      text-align: left;
-      font-size: 0.9rem;
-      cursor: pointer;
-      transition: background 0.1s;
-      outline: none;
-    }
-    #project-list button.proj-btn:hover,
-    #project-list button.proj-btn:focus {
-      background: var(--surface2);
-      outline: 2px solid var(--accent);
-      outline-offset: -2px;
-    }
-    #project-list button.proj-btn[aria-current="true"] {
-      background: var(--accent-dim);
-      border-left: 3px solid var(--accent);
-      color: var(--accent);
-      font-weight: bold;
-    }
-
-    #new-project-area {
-      padding: 0.6rem 0.75rem;
-      border-top: 1px solid var(--border);
-      display: flex;
-      flex-direction: column;
-      gap: 0.4rem;
-    }
-
-    input[type="text"], textarea, select {
-      font-family: var(--font);
-      font-size: 0.9rem;
-      background: var(--bg);
-      color: var(--text);
-      border: 1px solid var(--border);
-      border-radius: 3px;
-      padding: 0.4rem 0.6rem;
-      width: 100%;
-    }
-    input[type="text"]:focus,
-    textarea:focus,
-    select:focus {
-      outline: 2px solid var(--accent);
-      outline-offset: 1px;
-      border-color: var(--accent);
-    }
-
-    button {
-      font-family: var(--font);
-      font-size: 0.875rem;
-      background: var(--accent-dim);
-      color: var(--accent);
-      border: 1px solid var(--accent);
-      border-radius: 3px;
-      padding: 0.4rem 0.75rem;
-      cursor: pointer;
-      transition: background 0.15s;
-    }
-    button:hover, button:focus {
-      background: var(--accent);
-      color: #fff;
-      outline: 2px solid #fff;
-      outline-offset: 2px;
-    }
-    button:disabled { opacity: 0.45; cursor: default; }
-
-    button.danger {
-      background: transparent;
-      border-color: var(--error);
-      color: var(--error);
-    }
-    button.danger:hover, button.danger:focus {
-      background: var(--error);
-      color: #fff;
-    }
-
-    button.secondary {
-      background: transparent;
-      border-color: var(--border);
-      color: var(--text-dim);
-    }
-    button.secondary:hover, button.secondary:focus {
-      background: var(--surface2);
-      color: var(--text);
-    }
-
-    /* ── Right info panel ── */
-    #info-panel {
-      width: 220px;
-      flex-shrink: 0;
-      background: var(--surface);
-      border-left: 1px solid var(--border);
-      display: flex;
-      flex-direction: column;
-      overflow-y: auto;
-      padding: 0.75rem;
-      gap: 1rem;
-    }
-
-    .panel-section { display: flex; flex-direction: column; gap: 0.4rem; }
-    .panel-section h2 {
-      font-size: 0.78rem;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--text-dim);
-      font-weight: normal;
-    }
-    .panel-section p, .panel-section li {
-      font-size: 0.82rem;
-      color: var(--text-dim);
-    }
-
-    #indexed-files {
-      list-style: none;
-      display: flex;
-      flex-direction: column;
-      gap: 0.2rem;
-    }
-    #indexed-files li {
-      font-family: var(--mono);
-      font-size: 0.78rem;
-      padding: 0.2rem 0;
-      border-bottom: 1px solid var(--border);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    #indexed-files li:last-child { border-bottom: none; }
-    #docs-path {
-      font-family: var(--mono);
-      font-size: 0.72rem;
-      word-break: break-all;
-    }
-
-    /* ── Main ── */
-    #main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-
-    #status-bar {
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      padding: 0.35rem 1rem;
-      font-size: 0.8rem;
-      color: var(--text-dim);
-      min-height: 1.7rem;
-      flex-shrink: 0;
-    }
-
-    #messages {
-      flex: 1;
-      overflow-y: auto;
-      padding: 1rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.9rem;
-    }
-
-    .message {
-      border-radius: 3px;
-      padding: 0.7rem 0.9rem;
-    }
-    h2.role-label {
-      font-size: 0.72rem;
-      font-weight: normal;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--text-dim);
-      margin: 0 0 0.3rem 0;
-    }
-    .content { white-space: pre-wrap; line-height: 1.65; }
-    .message.user {
-      background: var(--user-bg);
-      border-left: 3px solid var(--accent);
-    }
-    .message.assistant {
-      background: var(--surface);
-      border-left: 3px solid var(--border);
-    }
-    .message.system-msg {
-      background: transparent;
-      border-left: 3px solid var(--warning);
-      color: var(--text-dim);
-      font-size: 0.875rem;
-    }
-
-    .sources {
-      margin-top: 0.5rem;
-      font-size: 0.78rem;
-      color: var(--text-dim);
-    }
-    .sources summary { cursor: pointer; }
-    .sources summary::marker { content: ""; }
-    .sources summary::before { content: "▶ "; font-size: 0.7em; }
-    details[open] > summary::before { content: "▼ "; }
-    .sources ul { list-style: none; margin-top: 0.35rem; }
-    .sources li { font-family: var(--mono); margin-bottom: 0.15rem; }
-    .score { color: var(--accent); }
-
-    .thinking {
-      background: var(--surface);
-      border-left: 3px solid var(--border);
-      padding: 0.7rem 0.9rem;
-      color: var(--text-dim);
-      font-style: italic;
-      border-radius: 3px;
-      animation: pulse 1.5s ease-in-out infinite;
-    }
-    @keyframes pulse { 0%,100%{opacity:.5} 50%{opacity:1} }
-
-    /* ── Markdown rendered content ── */
-    .content h1, .content h2, .content h3,
-    .content h4, .content h5, .content h6 {
-      margin: 0.75rem 0 0.35rem;
-      line-height: 1.3;
-      color: var(--text);
-    }
-    .content h1 { font-size: 1.3rem; }
-    .content h2 { font-size: 1.15rem; }
-    .content h3 { font-size: 1.05rem; color: var(--accent); }
-    .content p  { margin: 0.4rem 0; }
-    .content ul, .content ol { margin: 0.4rem 0 0.4rem 1.4rem; }
-    .content li { margin: 0.2rem 0; }
-    .content strong { color: var(--text); }
-    .content em { color: var(--text-dim); font-style: italic; }
-    .content hr { border: none; border-top: 1px solid var(--border); margin: 0.75rem 0; }
-    .content code {
-      font-family: var(--mono);
-      font-size: 0.875em;
-      background: var(--surface2);
-      padding: 0.1em 0.35em;
-      border-radius: 2px;
-    }
-    .content pre {
-      background: var(--surface2);
-      padding: 0.75rem;
-      border-radius: 3px;
-      overflow-x: auto;
-      margin: 0.5rem 0;
-    }
-    .content pre code { background: none; padding: 0; }
-    .content blockquote {
-      border-left: 3px solid var(--accent);
-      margin: 0.5rem 0;
-      padding: 0.1rem 0.75rem;
-      color: var(--text-dim);
-    }
-
-    /* ── Input area ── */
-    #input-area {
-      border-top: 1px solid var(--border);
-      padding: 0.6rem 0.75rem;
-      display: flex;
-      gap: 0.5rem;
-      flex-shrink: 0;
-      background: var(--surface);
-    }
-    #user-input {
-      flex: 1;
-      resize: vertical;
-      min-height: 2.6rem;
-      max-height: 9rem;
-      font-size: 1rem;
-      line-height: 1.5;
-      padding: 0.5rem 0.65rem;
-    }
-    #send-btn { align-self: flex-end; padding: 0.5rem 1rem; font-size: 1rem; }
-    #clear-btn { align-self: flex-end; }
-    #clear-btn.secondary { font-size: 0.85rem; }
-
-    /* ── Settings dialog ── */
-    dialog {
-      background: var(--surface);
-      color: var(--text);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 1.5rem;
-      max-width: 520px;
-      width: 90vw;
-      font-family: var(--font);
-    }
-    dialog::backdrop { background: rgba(0,0,0,0.6); }
-    dialog h2 { font-size: 1.1rem; margin-bottom: 1rem; font-weight: normal; }
-
-    .field { display: flex; flex-direction: column; gap: 0.3rem; margin-bottom: 0.85rem; }
-    .field label { font-size: 0.85rem; color: var(--text-dim); }
-    .field input, .field textarea, .field select { width: 100%; }
-    .field textarea { min-height: 5rem; resize: vertical; }
-    .field small { font-size: 0.75rem; color: var(--text-dim); }
-
-    .dialog-actions {
-      display: flex;
-      gap: 0.5rem;
-      justify-content: flex-end;
-      margin-top: 1rem;
-    }
-
-    /* ── Project action bar ── */
-    #project-actions {
-      display: flex;
-      gap: 0.4rem;
-      padding: 0.5rem 0.75rem;
-      border-bottom: 1px solid var(--border);
-      flex-shrink: 0;
-      flex-wrap: wrap;
-      align-items: center;
-    }
-    #current-project-name {
-      font-size: 0.95rem;
-      margin-right: auto;
-      color: var(--text);
-    }
-
-    .sr-only {
-      position: absolute; width: 1px; height: 1px;
-      padding: 0; margin: -1px; overflow: hidden;
-      clip: rect(0,0,0,0); white-space: nowrap; border: 0;
-    }
-
-    #no-project-msg {
-      flex: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--text-dim);
-      font-size: 1rem;
-      padding: 2rem;
-      text-align: center;
-    }
-  </style>
-</head>
+  </head>
 <body>
 
 <a href="#user-input" class="skip-link">Skip to message input</a>
 
 <header>
   <h1>AI Ally Light</h1>
-  <button id="default-settings-btn" class="secondary" aria-label="Open default settings for all projects">Default Settings</button>
+  <button id="btn-global-settings" class="secondary" aria-label="Open default settings for all projects">Default Settings</button>
   <span id="system-status" role="status" aria-live="polite">Checking…</span>
 </header>
 
@@ -453,7 +29,7 @@
     <div id="new-project-area">
       <label for="new-project-name" class="sr-only">New project name</label>
       <input type="text" id="new-project-name" placeholder="AI Ally Light project name…" autocomplete="off" />
-      <button id="create-project-btn" aria-label="Create new project">Create Project</button>
+      <button id="btn-create-project" aria-label="Create new project">Create Project</button>
     </div>
   </nav>
 
@@ -471,9 +47,9 @@
       <div id="project-actions">
         <span id="current-project-name" aria-live="polite"></span>
         <button id="rename-project-btn" class="secondary" aria-label="Rename current project">Rename</button>
-        <button id="reindex-btn" class="secondary" aria-label="Re-index documents for current project">Re-index</button>
-        <button id="settings-btn" class="secondary" aria-label="Open project-specific settings">Project Settings</button>
-        <button id="delete-project-btn" class="danger" aria-label="Delete current project">Delete</button>
+        <button id="btn-reindex-project" class="secondary" aria-label="Re-index documents for current project">Re-index</button>
+        <button id="btn-project-settings" class="secondary" aria-label="Open project-specific settings">Project Settings</button>
+        <button id="btn-delete-project" class="danger" aria-label="Delete current project">Delete</button>
       </div>
 
       <div id="status-bar" aria-live="polite" role="status"></div>
@@ -483,13 +59,13 @@
       <div id="input-area">
         <label for="user-input" class="sr-only">Your message</label>
         <textarea
-          id="user-input"
+          id="chat-input"
           placeholder="Ask AI Ally Light a question… (Enter to send, Shift+Enter for new line)"
           rows="2"
           aria-describedby="input-hint"
         ></textarea>
         <span id="input-hint" class="sr-only">Press Enter to send. Shift+Enter inserts a new line.</span>
-        <button id="send-btn" aria-label="Send message">Send</button>
+        <button id="btn-send-chat" aria-label="Send message">Send</button>
         <button id="clear-btn" class="secondary" aria-label="Clear conversation">Clear</button>
       </div>
     </div>
@@ -501,8 +77,8 @@
     <div class="panel-section">
       <h2>Documents</h2>
       <p style="font-size:0.78rem;color:var(--text-dim);margin-bottom:0.5rem;">Supported: .txt, .md</p>
-      <input type="file" id="file-upload" accept=".txt,.md" multiple style="display:none;" />
-      <button id="upload-btn" class="secondary" aria-label="Upload documents to this project">Upload Documents</button>
+      <input type="file" id="file-upload-input" accept=".txt,.md" multiple style="display:none;" />
+      <button id="btn-upload-file" class="secondary" aria-label="Upload documents to this project">Upload Documents</button>
       <p id="upload-status" aria-live="polite" style="font-size:0.78rem;margin-top:0.5rem;"></p>
     </div>
     <div class="panel-section">
@@ -896,89 +472,5 @@
     </div>
   </dialog>
 
-  <script>
-    // Essential logic to toggle the delimiter field based on radio buttons
-    document.querySelectorAll('input[name="ps-indexing-mode"]').forEach(radio => {
-      radio.addEventListener('change', (e) => {
-        const delimField = document.getElementById('delimiter-field');
-        const chunkFields = document.getElementById('standard-chunking-fields');
-        
-        if (e.target.value === 'delimiter') {
-          delimField.style.display = 'block';
-          chunkFields.style.display = 'none';
-        } else if (e.target.value === 'full_context') {
-          delimField.style.display = 'none';
-          chunkFields.style.display = 'none';
-        } else {
-          delimField.style.display = 'none';
-          chunkFields.style.display = 'block';
-        }
-      });
-    });
-
-    // Note: Re-insert your main (async () => { ... }) logic here 
-    // to ensure the app initializes correctly.
-	
-	// --- CORE LOGIC RECOVERY ---
-async function loadSystemStatus() {
-    const statusEl = document.getElementById('system-status');
-    try {
-        const res = await fetch('/api/status');
-        const data = await res.json();
-        
-        // We check 'embed_ok' because that's what main.py actually sends
-        if (data.embed_ok) {
-            statusEl.textContent = 'System Ready';
-            statusEl.className = 'ok'; // Assuming 'ok' is your green CSS class
-        } else {
-            statusEl.textContent = 'Ollama Offline';
-            statusEl.className = 'err';
-        }
-    } catch (e) {
-        statusEl.textContent = 'Connection Error';
-        statusEl.className = 'err';
-    }
-}
-
-async function loadProjects() {
-    const list = document.getElementById('project-list');
-    try {
-        const res = await fetch('/api/projects');
-        const projects = await res.json();
-        list.innerHTML = ''; // Clear "Loading..."
-        
-        if (projects.length === 0) {
-            list.innerHTML = '<li><span style="padding:0.75rem; display:block; color:var(--text-dim);">No projects found.</span></li>';
-            return;
-        }
-
-        projects.forEach(proj => {
-            const li = document.createElement('li');
-            li.innerHTML = `<button class="proj-btn" onclick="selectProject('${proj.id}')">${proj.name}</button>`;
-            list.appendChild(li);
-        });
-    } catch (e) {
-        list.innerHTML = '<li><span style="padding:0.75rem; color:var(--error);">Failed to load projects.</span></li>';
-    }
-}
-
-// Global variable to track current project
-let currentProjectId = null;
-
-async function selectProject(id) {
-    currentProjectId = id;
-    document.getElementById('no-project-msg').hidden = true;
-    document.getElementById('chat-area').hidden = false;
-    // Update UI labels
-    document.getElementById('current-project-name').textContent = `Project: ${id}`;
-    // Fetch project-specific details here...
-}
-
-// INITIALIZATION CALL
-(async () => {
-    await loadSystemStatus();
-    await loadProjects();
-})();
-  </script>
-</body>
-</html>
+<div id="announcer" aria-live="polite" class="sr-only" style="position:absolute; width:1px; height:1px; overflow:hidden;"></div>
+<script src="/static/app.js"></script>
