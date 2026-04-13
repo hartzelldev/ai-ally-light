@@ -1,0 +1,44 @@
+import uvicorn
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from pathlib import Path
+
+# Import the router we just built
+from routers import settings_router
+
+app = FastAPI(title="AI Ally Alpha")
+
+# 1. Setup Directories
+BASE_DIR = Path(__file__).resolve().parent
+app.mount("/static", StaticFiles(directory="static"), name="static")
+templates = Jinja2Templates(directory="templates")
+
+# 2. Register Routers
+# This tells FastAPI that any URL starting with /settings 
+# should be handled by settings_router.py
+app.include_router(settings_router.router, prefix="/settings")
+
+# 3. Main Landing Page
+@app.get("/", response_class=HTMLResponse)
+async def index(request: Request):
+    """
+    Renders the main dashboard. 
+    Screen readers will land here first.
+    """
+    return templates.TemplateResponse(
+    request=request, 
+    name="index.html", 
+    context={}
+)
+
+# 4. Global Error Handling (Optional but helpful)
+@app.exception_handler(404)
+async def not_found_handler(request: Request, exc):
+    return HTMLResponse("<h2>404: Page Not Found</h2>", status_code=404)
+
+if __name__ == "__main__":
+    # Run with auto-reload so it restarts when you save a file
+    uvicorn.run("app:app", host="127.0.0.1", port=5002, reload=True)
+    

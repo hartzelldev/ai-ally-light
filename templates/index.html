@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>AI Ally Light</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <header>
+        <h1>AI Ally Light</h1>
+        <nav>
+            <button 
+                hx-get="/settings/modal" 
+                hx-target="#modal-container" 
+                hx-trigger="click"
+                aria-haspopup="dialog">
+                Global Settings
+            </button>
+        </nav>
+    </header>
+
+    <main id="main-content">
+        <p>Welcome, Gary. Select a project or open settings to begin.</p>
+    </main>
+
+    <div id="modal-container" aria-live="polite"></div>
+</body>
+</html>

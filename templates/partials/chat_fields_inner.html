@@ -1,0 +1,12 @@
+<label for="chat_api_key">API Key:</label>
+<input type="password" id="chat_api_key" name="chat_api_key" value="{{ api_key }}"
+       {% if provider == 'ollama' %} disabled placeholder="Not required for Ollama" {% endif %}>
+
+<label for="chat_base_url">Chat Base URL:</label>
+<input type="text" id="chat_base_url" name="chat_base_url" value="{{ base_url }}">
+
+<p>
+    <a href="{{ model_link }}" target="_blank" rel="noopener">
+        View available models for {{ provider|capitalize }} (opens in new tab)
+    </a>
+</p>
