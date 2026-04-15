@@ -20,8 +20,27 @@
 			</button>        </nav>
     </header>
 
-    <main id="main-content">
-        <p>Select a project or open settings to begin.</p>
+	<main id="main-content">
+		<section id="project-management">
+			<h2>Projects</h2>
+			
+			<form hx-post="/projects/create" hx-target="#project-list-container">
+				<label for="project_name">New Project Name:</label>
+				<input type="text" id="project_name" name="project_name" required>
+				<button type="submit">Create Project</button>
+			</form>
+
+			<div id="project-list-container" 
+				 hx-get="/projects/list" 
+				 hx-trigger="load" 
+				 aria-live="polite">
+				</div>
+		</section>
+
+		<section id="chat">
+			<p>Select a project or open settings to begin.</p>
+		</section>
+		
     </main>
 
     <div id="modal-container" aria-live="polite"></div>

@@ -1,0 +1,13 @@
+<ul role="list" style="list-style: none; padding: 0;">
+    {% for project in projects %}
+    <li style="margin-bottom: 0.5rem;">
+        <button hx-get="/projects/open/{{ project }}" 
+                hx-target="#main-content"
+                class="project-link">
+            Open: {{ project.replace('_', ' ').capitalize() }}
+        </button>
+    </li>
+    {% else %}
+    <li>No projects found. Create one above to get started!</li>
+    {% endfor %}
+</ul>

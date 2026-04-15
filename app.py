@@ -7,8 +7,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
 
-# Import the router we just built
-from routers import settings_router
+# Import the routers
+from routers import settings_router, project_router  
 
 app = FastAPI(title="AI Ally Alpha")
 
@@ -18,9 +18,8 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
 # 2. Register Routers
-# This tells FastAPI that any URL starting with /settings 
-# should be handled by settings_router.py
 app.include_router(settings_router.router, prefix="/settings")
+app.include_router(project_router.router, prefix="/projects")
 
 # 3. Main Landing Page
 @app.get("/", response_class=HTMLResponse)
