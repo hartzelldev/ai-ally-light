@@ -30,11 +30,17 @@
 				<button type="submit">Create Project</button>
 			</form>
 
-			<div id="project-list-container" 
-				 hx-get="/projects/list" 
-				 hx-trigger="load" 
-				 aria-live="polite">
-				</div>
+<div id="global-alert" 
+     role="alert" 
+     aria-live="assertive" 
+     style="color: green; font-weight: bold; padding: 10px;">
+</div>
+
+<div id="project-list-container" 
+     hx-get="/projects/list" 
+     hx-trigger="load" 
+     aria-live="polite">
+</div>
 		</section>
 
 		<section id="chat">

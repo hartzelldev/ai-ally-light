@@ -1,0 +1,18 @@
+<div id="rename-modal-overlay" class="modal-overlay" role="dialog" aria-labelledby="rename-title">
+    <div class="modal-content">
+        <h2 id="rename-title">Rename Project: {{ project_name }}</h2>
+        
+        <form hx-post="/projects/rename/{{ project_name }}" 
+              hx-target="#main-content"
+              hx-on::after-request="document.getElementById('rename-modal-overlay').remove()">
+            
+            <label for="new_name">New Display Name:</label>
+            <input type="text" id="new_name" name="new_name" autofocus required>
+            
+            <div class="modal-actions">
+                <button type="submit">Confirm Rename</button>
+                <button type="button" onclick="this.closest('.modal-overlay').remove()">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
