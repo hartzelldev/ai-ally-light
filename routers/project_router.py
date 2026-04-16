@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request, Form
+from fastapi import APIRouter, Request, Form, Response
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
@@ -21,19 +21,17 @@ async def list_projects(request: Request):
         context={"projects": projects}
     )
 
-@router.post("/create", response_class=HTMLResponse)
-async def create_project(request: Request, project_name: str = Form(...)):
-    """Creates a new project folder and returns the updated list."""
-    # Clean the name for a folder (lowercase, no spaces)
+@router.post("/create")
+async def create_project(project_name: str = Form(...)):
+    """Creates a new project folder and tells the browser to reload."""
     folder_name = project_name.lower().replace(" ", "_")
     new_path = PROJECTS_DIR / folder_name
     
     if not new_path.exists():
         new_path.mkdir()
-        # You could also initialize a blank config here
     
-    # Trigger a refresh of the project list
-    return await list_projects(request)
+    # This replaces the old 'return await list_projects'
+    return Response(headers={"HX-Refresh": "true"})
     
 @router.get("/open/{project_name}", response_class=HTMLResponse)
 async def open_project(request: Request, project_name: str):
@@ -61,32 +59,30 @@ async def rename_prompt(request: Request, project_name: str):
         context={"project_name": project_name}
     )
 
-@router.post("/rename/{project_name}", response_class=HTMLResponse)
-async def rename_project(request: Request, project_name: str, new_name: str = Form(...)):
-    """Renames the folder and returns the project list with a success message."""
+@router.post("/rename/{project_name}")
+async def rename_project(project_name: str, new_name: str = Form(...)):
+    """
+    Renames the project folder on disk and tells the browser to refresh.
+    """
+    # 1. Clean the new name for a folder path
     new_folder_name = new_name.lower().replace(" ", "_")
+    
+    # 2. Define the paths
     old_path = PROJECTS_DIR / project_name
     new_path = PROJECTS_DIR / new_folder_name
     
-    # 1. Check for collision
+    # 3. Safety Check: If the new folder name already exists, don't do anything
     if new_path.exists():
-        return f"<span role='alert' style='color: red;'>Error: A project named {new_name} already exists.</span>"
+        # You could return an error message here, but for now, 
+        # we'll just refresh to clear the modal.
+        return Response(headers={"HX-Refresh": "true"})
 
-    # 2. Perform the rename on the disk
-    os.rename(old_path, new_path)
+    # 4. Perform the rename
+    if old_path.exists():
+        os.rename(old_path, new_path)
     
-    # 3. Get the fresh list of folders
-    projects = [d.name for d in PROJECTS_DIR.iterdir() if d.is_dir()]
-    
-    # 4. Return the template WITH the message context
-    return templates.TemplateResponse(
-        request=request,
-        name="partials/project_list.html",
-        context={
-            "projects": projects,
-            "message": f"Success: Project renamed to {new_name}"
-        }
-    )
+    # 5. Tell HTMX to reload the whole page
+    return Response(headers={"HX-Refresh": "true"})
 
 @router.delete("/delete/{project_name}")
 async def delete_project(project_name: str):
@@ -94,9 +90,7 @@ async def delete_project(project_name: str):
     project_path = PROJECTS_DIR / project_name
     if project_path.exists():
         shutil.rmtree(project_path)
-    
-    # Returning this header tells HTMX to refresh the entire page automatically
-    return HTMLResponse(content="", headers={"HX-Refresh": "true"})
+    return Response(headers={"HX-Refresh": "true"})
 
 @router.get("/settings/{project_name}", response_class=HTMLResponse)
 async def get_project_settings(request: Request, project_name: str):
