@@ -1,0 +1,29 @@
+<table class="file-table">
+    <thead>
+        <tr>
+            <th scope="col">Filename</th>
+            <th scope="col">Size</th>
+            <th scope="col">Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for file in files %}
+        <tr>
+            <td>{{ file.name }}</td>
+            <td>{{ file.size_kb }} KB</td>
+            <td>
+			<button class="btn-danger" 
+					hx-delete="/projects/files/delete/{{ project_name }}/{{ file.name }}"
+					hx-confirm="Are you sure you want to delete {{ file.name }}?"
+					hx-target="#file-list">
+				Delete
+			</button>
+            </td>
+        </tr>
+        {% else %}
+        <tr>
+            <td colspan="3">No files uploaded yet for this project.</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>

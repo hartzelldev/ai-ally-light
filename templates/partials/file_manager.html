@@ -1,0 +1,15 @@
+<section id="file-manager">
+    <h3>Project Files</h3>
+    
+    <form hx-encoding="multipart/form-data" 
+          hx-post="/projects/files/upload/{{ project_name }}" 
+          hx-target="#file-list-container">
+        
+        <input type="file" id="file-upload" name="file" required aria-label="Select file">
+        <button type="submit" class="btn-action">Upload and Index</button>
+    </form>
+
+    <div id="file-list-container" hx-get="/projects/files/list/{{ project_name }}" hx-trigger="load">
+        {% include 'partials/file_list_inner.html' %}
+    </div>
+</section>

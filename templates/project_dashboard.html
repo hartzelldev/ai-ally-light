@@ -20,22 +20,24 @@
         <aside style="flex: 1;" role="complementary">
             <section id="threads-section">
                 <h2>Threads</h2>
-                <button hx-post="/threads/new/{{ project_name }}" hx-target="#chat-window">New Thread</button>
+                <button hx-post="/projects/threads/new/{{ project_name }}" hx-target="#chat-window">New Thread</button>
                 <div id="thread-list" hx-get="/threads/list/{{ project_name }}" hx-trigger="load">
                     </div>
             </section>
 
             <section id="files-section" style="margin-top: 2rem;">
                 <h2>Files & Indexing</h2>
-                <form hx-encoding="multipart/form-data" hx-post="/files/upload/{{ project_name }}">
-                    <label for="file-upload">Upload Asset:</label>
-                    <input type="file" id="file-upload" name="file">
-                    <button type="submit">Upload</button>
-                </form>
-                <div id="file-list" hx-get="/files/list/{{ project_name }}" hx-trigger="load">
-                    </div>
-            </section>
-        </aside>
+<form hx-encoding="multipart/form-data" 
+      hx-post="/projects/files/upload/{{ project_name }}" 
+      hx-target="#file-list"> <label for="file-upload">Upload Asset:</label>
+    <input type="file" id="file-upload" name="file">
+    <button type="submit">Upload</button>
+</form>
+
+<div id="file-list" 
+     hx-get="/projects/files/list/{{ project_name }}" 
+     hx-trigger="load">
+    </div>
 
         <section style="flex: 2;" id="chat-interface">
             <h2>Chat</h2>
