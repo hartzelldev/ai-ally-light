@@ -5,9 +5,7 @@
         <div id="proj-settings-status" aria-live="assertive">
             <span class="visually-hidden">Adjusting overrides for {{ display_name }}</span>
         </div>
-
-        <form hx-post="/projects/save-settings/{{ project_name }}" hx-target="#proj-settings-status">
-            
+		<form hx-post="/projects/save-settings/{{ project_name }}">
             <fieldset>
                 <legend>Project AI Personality</legend>
 
@@ -55,20 +53,33 @@
                        value="{{ config.embed_api_key or '' }}" 
                        placeholder="Leave blank to use global key">
 
-                <label for="embed_method">Chunking Strategy:</label>
-                <select id="embed_method" name="embed_method">
-                    <option value="size" {% if config.embed_method == 'size' %}selected{% endif %}>Size Chunking</option>
-                    <option value="delimiter" {% if config.embed_method == 'delimiter' %}selected{% endif %}>Delimiter Chunking</option>
-                    <option value="full" {% if config.embed_method == 'full' %}selected{% endif %}>Full Context</option>
-                </select>
+<fieldset style="margin-top: 1.5rem;">
+    <legend id="method-label">Chunking Strategy</legend>
+    <div role="radiogroup" aria-labelledby="method-label">
+        
+        <input type="radio" id="method_size" name="embed_method" value="size" 
+               hx-get="/projects/settings/embed-fields/{{ project_name }}" 
+               hx-target="#project-embed-fields-wrapper"
+               {% if config.embed_method == 'size' %}checked{% endif %}>
+        <label for="method_size">Size Chunking</label>
 
-                <label for="chunk_size">Chunk Size:</label>
-                <input type="number" id="chunk_size" name="chunk_size" value="{{ config.chunk_size }}">
+        <input type="radio" id="method_delimiter" name="embed_method" value="delimiter" 
+               hx-get="/projects/settings/embed-fields/{{ project_name }}" 
+               hx-target="#project-embed-fields-wrapper"
+               {% if config.embed_method == 'delimiter' %}checked{% endif %}>
+        <label for="method_delimiter">Delimiter Chunking</label>
 
-                <label for="chunk_overlap">Chunk Overlap:</label>
-                <input type="number" id="chunk_overlap" name="chunk_overlap" value="{{ config.chunk_overlap }}">
-            </fieldset>
+        <input type="radio" id="method_full" name="embed_method" value="full" 
+               hx-get="/projects/settings/embed-fields/{{ project_name }}" 
+               hx-target="#project-embed-fields-wrapper"
+               {% if config.embed_method == 'full' %}checked{% endif %}>
+        <label for="method_full">Full Context</label>
+    </div>
 
+    <div id="project-embed-fields-wrapper" aria-live="polite">
+        {% include 'partials/project_embed_fields_inner.html' with context %}
+    </div>
+</fieldset>
             <div class="modal-actions" style="margin-top: 2rem;">
                 <button type="submit" class="btn-save">Save Project Settings</button>
                 <button type="button" class="btn-cancel" onclick="document.getElementById('project-settings-modal').remove()">Close</button>

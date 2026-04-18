@@ -4,6 +4,12 @@
         <nav aria-label="Project Actions">
             <button hx-get="/projects/settings/{{ project_name }}" hx-target="#modal-container">Project Settings</button>
             <button hx-get="/projects/rename-prompt/{{ project_name }}" hx-target="#modal-container">Rename</button>
+			<button class="btn-warning" 
+				hx-post="/projects/reindex-all/{{ project_name }}"
+				hx-confirm="This will rebuild the entire database using current settings. Proceed?"
+				hx-target="#file-list">
+					Reindex All Files
+			</button>
 			<button style="color: red;" 
 				hx-delete="/projects/delete/{{ project_name }}" 
 				hx-target="#main-content" 

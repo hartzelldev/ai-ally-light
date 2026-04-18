@@ -6,9 +6,11 @@ import os
 import shutil
 import json
 from dotenv import load_dotenv
+from typing import Optional
 from core.config_manager import manager
 from providers.chat import CHAT_PROVIDERS
 from providers.embeddings import EMBED_PROVIDERS
+from core.indexer import chunk_text, index_file_chunks, delete_file_from_index, clear_entire_index
 
 # If you include this in main.py with prefix="/projects", 
 # then these routes will be /projects/list, /projects/open, etc.
@@ -19,6 +21,42 @@ PROJECTS_DIR = Path("projects")
 PROJECTS_DIR.mkdir(exist_ok=True)
 
 # --- HELPERS ---
+
+def get_active_config(project_name: str):
+    """Helper to get the merged global and local project settings."""
+    project_path = PROJECTS_DIR / project_name
+    config_path = project_path / "project_config.json"
+    project_env = project_path / ".env"
+    
+    # 1. Start with Global Defaults
+    active_config = {
+        "chat_provider": manager.config.chat.provider,
+        "chat_model": manager.config.chat.model,
+        "temperature": manager.config.chat.temperature,
+        "system_prompt": manager.config.chat.system_prompt,
+        "embed_provider": manager.config.embeddings.provider,
+        "embed_model": manager.config.embeddings.model,
+        "embed_method": manager.config.embeddings.method,
+        "chunk_size": manager.config.embeddings.chunk_size,
+        "chunk_overlap": manager.config.embeddings.chunk_overlap,
+        "delimiter": getattr(manager.config.embeddings, 'delimiter', '\n\n')
+    }
+    
+    # 2. Load Environment Keys (if they exist)
+    if project_env.exists():
+        load_dotenv(project_env, override=True)
+        active_config["chat_api_key"] = os.getenv("PROJECT_CHAT_API_KEY", "")
+        active_config["embed_api_key"] = os.getenv("PROJECT_EMBED_API_KEY", "")
+
+    # 3. Apply Local JSON Overrides
+    if config_path.exists():
+        try:
+            with open(config_path, "r") as f:
+                active_config.update(json.load(f))
+        except Exception:
+            pass
+            
+    return active_config
 
 def get_project_files(project_name: str):
     """Helper to list files in the project directory."""
@@ -67,20 +105,7 @@ async def open_project(request: Request, project_name: str):
     if project_env.exists():
         load_dotenv(project_env, override=True)
     
-    active_config = {
-        "chat_provider": manager.config.chat.provider,
-        "chat_model": manager.config.chat.model,
-        "chat_api_key": os.getenv("PROJECT_CHAT_API_KEY", ""),
-        "temperature": manager.config.chat.temperature,
-        "system_prompt": manager.config.chat.system_prompt,
-        "embed_provider": manager.config.embeddings.provider,
-        "embed_model": manager.config.embeddings.model,
-        "embed_api_key": os.getenv("PROJECT_EMBED_API_KEY", ""),
-        "embed_method": manager.config.embeddings.method,
-        "chunk_size": manager.config.embeddings.chunk_size,
-        "chunk_overlap": manager.config.embeddings.chunk_overlap
-    }
-    
+    active_config = get_active_config(project_name)    
     if config_path.exists():
         try:
             with open(config_path, "r") as f:
@@ -175,13 +200,16 @@ async def save_project_settings(
     embed_model: str = Form(...),
     embed_api_key: str = Form(None),
     embed_method: str = Form(...),
-    chunk_size: int = Form(...),
-    chunk_overlap: int = Form(...)
+    # Added = Form(None) to prevent 422 errors when these fields are hidden
+    chunk_size: Optional[int] = Form(None),
+    chunk_overlap: Optional[int] = Form(None),
+    delimiter: Optional[str] = Form(None)
 ):
     project_path = PROJECTS_DIR / project_name
     config_path = project_path / "project_config.json"
     project_env = project_path / ".env"
     
+    # We build the dictionary, ensuring we handle the potentially missing fields
     overrides = {
         "chat_provider": chat_provider,
         "chat_model": chat_model,
@@ -191,12 +219,15 @@ async def save_project_settings(
         "embed_model": embed_model,
         "embed_method": embed_method,
         "chunk_size": chunk_size,
-        "chunk_overlap": chunk_overlap
+        "chunk_overlap": chunk_overlap,
+        "delimiter": delimiter
     }
     
+    # Write the JSON config
     with open(config_path, "w") as f:
         json.dump(overrides, f, indent=4)
 
+    # Handle the .env file for API keys
     env_lines = []
     if chat_api_key:
         env_lines.append(f"PROJECT_CHAT_API_KEY={chat_api_key}\n")
@@ -206,8 +237,15 @@ async def save_project_settings(
     if env_lines:
         with open(project_env, "w") as f:
             f.writelines(env_lines)
-    
-    return Response(headers={"HX-Refresh": "true"})
+    elif project_env.exists():
+        # Optional: clear the file if no keys are provided
+        project_env.unlink()
+
+    # SUCCESS: Return the HX-Redirect header to refresh the dashboard
+    # This is moved outside the 'if env_lines' block so it always runs
+    return Response(
+        headers={"HX-Redirect": f"/projects/open/{project_name}"}
+    )
 
 # --- FILE MANAGEMENT ---
 
@@ -225,12 +263,30 @@ async def upload_file(request: Request, project_name: str, file: UploadFile = Fi
     project_path = PROJECTS_DIR / project_name
     save_path = project_path / file.filename
     
+    # 1. Save the actual file to disk
     with open(save_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
     
+# 2. Get the config
+    active_config = get_active_config(project_name) 
+
+    # 3. Process and Index
+    try:
+        content = save_path.read_text(encoding="utf-8", errors="ignore")
+        
+        # Match 'active_config' here
+        chunks = chunk_text(content, active_config) 
+        
+        # Capture the return value so 'num_indexed' actually exists
+        num_indexed = index_file_chunks(project_name, file.filename, chunks)
+        
+        print(f"Success: {file.filename} indexed into {num_indexed} chunks.")
+    except Exception as e:
+        print(f"Indexing failed for {file.filename}: {e}")
+    # 4. Refresh the UI
     files = get_project_files(project_name)
     return templates.TemplateResponse(
-        request,  # <--- Added this as a positional argument
+        request, 
         name="partials/file_list_inner.html",
         context={"request": request, "project_name": project_name, "files": files}
     )
@@ -249,4 +305,64 @@ async def delete_file(request: Request, project_name: str, filename: str):
         context={"request": request, "project_name": project_name, "files": files}
     )
     
+
+@router.post("/files/reindex/{project_name}/{filename}")
+async def reindex_file(request: Request, project_name: str, filename: str):
+    project_path = PROJECTS_DIR / project_name
+    file_path = project_path / filename
     
+    if file_path.exists():
+        # 1. Clear old data
+        delete_file_from_index(project_name, filename)
+        
+        # 2. Re-index with current settings
+        active_config = get_active_config(project_name)
+        content = file_path.read_text(encoding="utf-8", errors="ignore")
+        chunks = chunk_text(content, active_config)
+        index_file_chunks(project_name, filename, chunks)
+        print(f"Reindexed: {filename} into {len(chunks)} chunks.")
+
+    files = get_project_files(project_name)
+    return templates.TemplateResponse(
+        request, 
+        name="partials/file_list_inner.html",
+        context={"request": request, "project_name": project_name, "files": files}
+    )
+
+@router.post("/reindex-all/{project_name}")
+async def reindex_all(request: Request, project_name: str):
+    # 1. Nuke the whole DB
+    clear_entire_index(project_name)
+    
+    # 2. Loop through all files on disk and index them
+    active_config = get_active_config(project_name)
+    project_path = PROJECTS_DIR / project_name
+    
+    for file_path in project_path.iterdir():
+        # Only index common text files to avoid binary junk
+        if file_path.suffix in ['.txt', '.md', '.json', '.log']:
+            content = file_path.read_text(encoding="utf-8", errors="ignore")
+            chunks = chunk_text(content, active_config)
+            index_file_chunks(project_name, file_path.name, chunks)
+            print(f"Reindexed: {file_path.name}")
+
+    files = get_project_files(project_name)
+    return templates.TemplateResponse(
+        request, 
+        name="partials/file_list_inner.html",
+        context={"request": request, "project_name": project_name, "files": files}
+    )
+
+@router.get("/settings/embed-fields/{project_name}")
+async def get_project_embed_fields(request: Request, project_name: str, embed_method: str):
+    # Fetch existing config
+    config = get_active_config(project_name)
+    
+    # Update the method in the config object passed to the template
+    config['embed_method'] = embed_method
+    
+    return templates.TemplateResponse(
+        request,
+        name="partials/project_embed_fields_inner.html",
+        context={"request": request, "config": config}
+    )

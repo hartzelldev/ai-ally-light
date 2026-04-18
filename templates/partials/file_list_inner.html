@@ -18,7 +18,12 @@
 					hx-target="#file-list">
 				Delete
 			</button>
-            </td>
+            <button class="btn-secondary" 
+				hx-post="/projects/files/reindex/{{ project_name }}/{{ file.name }}"
+				hx-target="#file-list">
+			Reindex
+			</button>
+		</td>
         </tr>
         {% else %}
         <tr>
