@@ -25,10 +25,32 @@
     <div style="display: flex; gap: 2rem;">
         <aside style="flex: 1;" role="complementary">
             <section id="threads-section">
-                <h2>Threads</h2>
-                <button hx-post="/projects/threads/new/{{ project_name }}" hx-target="#chat-window">New Thread</button>
-                <div id="thread-list" hx-get="/threads/list/{{ project_name }}" hx-trigger="load">
-                    </div>
+			<nav aria-labelledby="threads-header">
+			<h2 id="threads-header">Project Threads</h2>
+
+			<button hx-post="/threads/create/{{ project_name }}" 
+				hx-target="#thread-list" 
+				hx-swap="afterbegin"
+				class="btn-new-thread">
+			+ New Thread
+			</button>
+
+			<ul id="thread-list" class="thread-list">
+				{% for thread in threads %}
+					{% include "partials/thread_item.html" %}
+				{% endfor %}
+			</ul>
+
+			{% if has_more %}
+			<button id="show-more-threads" 
+				hx-get="/threads/list/{{ project_name }}?offset={{ threads|length }}" 
+				hx-target="this" 
+				hx-swap="outerHTML"
+				class="btn-link">
+			Show More Threads...
+			</button>
+			{% endif %}
+			</nav>
             </section>
 
             <section id="files-section" style="margin-top: 2rem;">

@@ -11,9 +11,9 @@ from core.config_manager import manager
 from providers.chat import CHAT_PROVIDERS
 from providers.embeddings import EMBED_PROVIDERS
 from core.indexer import chunk_text, index_file_chunks, delete_file_from_index, clear_entire_index
+from core.database_manager import ProjectDatabase
 
-# If you include this in main.py with prefix="/projects", 
-# then these routes will be /projects/list, /projects/open, etc.
+
 router = APIRouter()
 templates = Jinja2Templates(directory="templates")
 
@@ -102,6 +102,9 @@ async def open_project(request: Request, project_name: str):
     config_path = project_path / "project_config.json"
     project_env = project_path / ".env"
     
+    # 1. Initialize the project-specific database
+    db = ProjectDatabase(project_path) 
+    
     if project_env.exists():
         load_dotenv(project_env, override=True)
     
@@ -112,6 +115,15 @@ async def open_project(request: Request, project_name: str):
                 active_config.update(json.load(f))
         except Exception:
             pass
+
+    # 2. Handle Thread Loading
+    # Use the 'max_shown_threads' from the loaded config, defaulting to 10
+    thread_limit = active_config.get("max_shown_threads", 10)
+    threads = db.get_threads(limit=thread_limit)
+    
+    # Logic for the "Show More" button: 
+    # If we retrieved exactly the limit, there's a high chance more exist.
+    has_more = len(threads) >= thread_limit
 
     display_name = project_name.replace("_", " ").title()
     files = get_project_files(project_name) 
@@ -125,7 +137,9 @@ async def open_project(request: Request, project_name: str):
             "config": active_config,
             "chat_providers": CHAT_PROVIDERS,
             "embed_providers": EMBED_PROVIDERS,
-            "files": files
+            "files": files,
+            "threads": threads,      # New context variable
+            "has_more": has_more     # New context variable
         }
     )
 
