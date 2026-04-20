@@ -18,7 +18,7 @@ logging.getLogger("transformers").setLevel(logging.ERROR)
 logging.getLogger("sentence_transformers").setLevel(logging.ERROR)
 
 # Import the routers
-from routers import settings_router, project_router, threads_router  
+from routers import settings_router, project_router, threads_router, chat_router  
 
 app = FastAPI(title="AI Ally Light")
 
@@ -31,6 +31,7 @@ templates = Jinja2Templates(directory="templates")
 app.include_router(settings_router.router, prefix="/settings")
 app.include_router(project_router.router, prefix="/projects")
 app.include_router(threads_router.router, prefix="/threads")
+app.include_router(chat_router.router, prefix="/chat")
 
 # 3. Main Landing Page
 @app.get("/", response_class=HTMLResponse)

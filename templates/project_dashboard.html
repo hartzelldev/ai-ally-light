@@ -67,19 +67,9 @@
      hx-trigger="load">
     </div>
 
-        <section style="flex: 2;" id="chat-interface">
-            <h2>Chat</h2>
-            <div id="chat-window" 
-                 style="height: 400px; border: 1px solid #ccc; overflow-y: auto; margin-bottom: 1rem;" 
-                 aria-live="polite">
-                <p>Select a thread or start a new one to begin chatting.</p>
-            </div>
-            
-            <form hx-post="/chat/send/{{ project_name }}" hx-target="#chat-window" hx-swap="beforeend">
-                <label for="user-input" class="visually-hidden">Message:</label>
-                <textarea id="user-input" name="message" rows="3" style="width: 100%;" placeholder="Type your message here..."></textarea>
-                <button type="submit">Send Message</button>
-            </form>
-        </section>
+<main id="chat-window">
+    <p>Select a thread from the sidebar to start chatting, or create a new one.</p>
+</main>
+
     </div>
 </div>

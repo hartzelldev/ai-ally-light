@@ -1,0 +1,35 @@
+<div id="chat-log" 
+     role="log" 
+     aria-live="polite" 
+     aria-relevant="additions">
+    
+    {% for msg in messages %}
+        <section class="message {{ msg.role }}">
+            {% if msg.role == 'user' %}
+                <h3>You said:</h3>
+            {% else %}
+                <h3>Ally said:</h3>
+            {% endif %}
+            <p>{{ msg.content }}</p>
+        </section>
+        <hr aria-hidden="true">
+    {% endfor %}
+</div>
+
+    <div id="chat-input-area" style="margin-top: 1rem;">
+        <form hx-post="/chat/send/{{ project_name }}/{{ thread_id }}" 
+              hx-target="#chat-log" 
+              hx-swap="beforeend"
+              hx-on::after-request="this.reset()">
+            
+            <label for="user_input">Type your message:</label>
+            <textarea id="user_input" 
+                      name="user_input" 
+                      rows="3" 
+                      style="width: 100%;" 
+                      required></textarea>
+            
+            <button type="submit">Send Message</button>
+        </form>
+    </div>
+</section>
