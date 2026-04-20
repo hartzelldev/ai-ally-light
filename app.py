@@ -6,11 +6,21 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
+import os
+import logging
+
+# Force offline mode for Hugging Face to prevent the launch hang
+os.environ["HF_HUB_OFFLINE"] = "1"
+os.environ["TRANSFORMERS_OFFLINE"] = "1"
+
+# Silence the internal library warnings
+logging.getLogger("transformers").setLevel(logging.ERROR)
+logging.getLogger("sentence_transformers").setLevel(logging.ERROR)
 
 # Import the routers
 from routers import settings_router, project_router  
 
-app = FastAPI(title="AI Ally Alpha")
+app = FastAPI(title="AI Ally Light")
 
 # 1. Setup Directories
 BASE_DIR = Path(__file__).resolve().parent

@@ -32,17 +32,34 @@
 
             <fieldset style="margin-top: 1.5rem;">
                 <legend>Embedding Settings</legend>
+<div class="settings-group">
+    <label for="embed_provider">Default Embeddings Provider:</label>
+    <select id="embed_provider" 
+            name="embed_provider" 
+            onchange="toggleEmbedFields(this.value)">
+        <optgroup label="Local (No API Required)">
+            <option value="builtin" {% if config.embed_provider == 'builtin' %}selected{% endif %}>Built-In (Local - MiniLM)</option>
+            <option value="ollama" {% if config.embed_provider == 'ollama' %}selected{% endif %}>Ollama (Local)</option>
+        </optgroup>
+        <optgroup label="Cloud (API Key Required)">
+            <option value="openrouter" {% if config.embed_provider == 'openrouter' %}selected{% endif %}>OpenRouter</option>
+            <option value="huggingface" {% if config.embed_provider == 'huggingface' %}selected{% endif %}>HuggingFace (Remote)</option>
+            <option value="other" {% if config.embed_provider == 'other' %}selected{% endif %}>Other (Custom)</option>
+        </optgroup>
+    </select>
+</div>
 
-                <label for="embed_provider">Embeddings Provider:</label>
-                <select id="embed_provider" name="embed_provider">
-                    {% for p in providers %}
-                    <option value="{{ p }}" {% if config.embeddings.provider == p %}selected{% endif %}>{{ p|capitalize }}</option>
-                    {% endfor %}
-                </select>
+{% include "partials/embed_key_field_inner.html" %}
 
-                <label for="embed_model">Embedding Model:</label>
-                <input type="text" id="embed_model" name="embed_model" value="{{ config.embeddings.model }}">
-
+<script>
+function toggleEmbedFields(val) {
+    // Note: The ID 'embed-api-key-container' is defined inside the partial
+    const container = document.getElementById('embed-api-key-container');
+    if (!container) return;
+    const localProviders = ['builtin', 'ollama'];
+    container.style.display = localProviders.includes(val) ? 'none' : 'block';
+}
+</script>
 <fieldset style="margin-top: 1.5rem;">
     <legend>Embedding Method</legend>
     <div role="radiogroup" aria-labelledby="method-label">

@@ -5,7 +5,8 @@
         <div id="proj-settings-status" aria-live="assertive">
             <span class="visually-hidden">Adjusting overrides for {{ display_name }}</span>
         </div>
-		<form hx-post="/projects/save-settings/{{ project_name }}">
+
+        <form hx-post="/projects/save-settings/{{ project_name }}">
             <fieldset>
                 <legend>Project AI Personality</legend>
 
@@ -35,51 +36,62 @@
 
             <fieldset style="margin-top: 1.5rem;">
                 <legend>Project Embedding Strategy</legend>
+                
+<div class="settings-group">
+    <label for="embed_provider">Embeddings Provider:</label>
+    <select id="embed_provider" 
+            name="embed_provider" 
+            onchange="toggleEmbedFields(this.value)">
+        <optgroup label="Local (No API Required)">
+            <option value="builtin" {% if config.embed_provider == 'builtin' %}selected{% endif %}>Built-In (Local - MiniLM)</option>
+            <option value="ollama" {% if config.embed_provider == 'ollama' %}selected{% endif %}>Ollama (Local)</option>
+        </optgroup>
+        <optgroup label="Cloud (API Key Required)">
+            <option value="openrouter" {% if config.embed_provider == 'openrouter' %}selected{% endif %}>OpenRouter</option>
+            <option value="huggingface" {% if config.embed_provider == 'huggingface' %}selected{% endif %}>HuggingFace (Remote)</option>
+            <option value="other" {% if config.embed_provider == 'other' %}selected{% endif %}>Other (Custom)</option>
+        </optgroup>
+    </select>
+</div>
 
-                <label for="embed_provider">Embeddings Provider:</label>
-                <select id="embed_provider" name="embed_provider">
-                    {% for key, info in embed_providers.items() %}
-                    <option value="{{ key }}" {% if config.embed_provider == key %}selected{% endif %}>
-                        {{ info.name }}
-                    </option>
-                    {% endfor %}
-                </select>
+{% include "partials/embed_key_field_inner.html" %}
 
-                <label for="embed_model">Embedding Model:</label>
-                <input type="text" id="embed_model" name="embed_model" value="{{ config.embed_model }}">
+<script>
+function toggleEmbedFields(val) {
+    // This ID must match the ID inside your partial file
+    const container = document.getElementById('embed-api-key-container');
+    if (!container) return;
+    const localProviders = ['builtin', 'ollama'];
+    container.style.display = localProviders.includes(val) ? 'none' : 'block';
+}
+</script>
+            <fieldset style="margin-top: 1.5rem;">
+                <legend id="method-label">Chunking Strategy</legend>
+                <div role="radiogroup" aria-labelledby="method-label">
+                    <input type="radio" id="method_size" name="embed_method" value="size" 
+                           hx-get="/projects/settings/embed-fields/{{ project_name }}" 
+                           hx-target="#project-embed-fields-wrapper"
+                           {% if config.embed_method == 'size' %}checked{% endif %}>
+                    <label for="method_size">Size Chunking</label>
 
-                <label for="embed_api_key">Embedding API Key (Overrides Global):</label>
-                <input type="password" id="embed_api_key" name="embed_api_key" 
-                       value="{{ config.embed_api_key or '' }}" 
-                       placeholder="Leave blank to use global key">
+                    <input type="radio" id="method_delimiter" name="embed_method" value="delimiter" 
+                           hx-get="/projects/settings/embed-fields/{{ project_name }}" 
+                           hx-target="#project-embed-fields-wrapper"
+                           {% if config.embed_method == 'delimiter' %}checked{% endif %}>
+                    <label for="method_delimiter">Delimiter Chunking</label>
 
-<fieldset style="margin-top: 1.5rem;">
-    <legend id="method-label">Chunking Strategy</legend>
-    <div role="radiogroup" aria-labelledby="method-label">
-        
-        <input type="radio" id="method_size" name="embed_method" value="size" 
-               hx-get="/projects/settings/embed-fields/{{ project_name }}" 
-               hx-target="#project-embed-fields-wrapper"
-               {% if config.embed_method == 'size' %}checked{% endif %}>
-        <label for="method_size">Size Chunking</label>
+                    <input type="radio" id="method_full" name="embed_method" value="full" 
+                           hx-get="/projects/settings/embed-fields/{{ project_name }}" 
+                           hx-target="#project-embed-fields-wrapper"
+                           {% if config.embed_method == 'full' %}checked{% endif %}>
+                    <label for="method_full">Full Context</label>
+                </div>
 
-        <input type="radio" id="method_delimiter" name="embed_method" value="delimiter" 
-               hx-get="/projects/settings/embed-fields/{{ project_name }}" 
-               hx-target="#project-embed-fields-wrapper"
-               {% if config.embed_method == 'delimiter' %}checked{% endif %}>
-        <label for="method_delimiter">Delimiter Chunking</label>
+                <div id="project-embed-fields-wrapper" aria-live="polite">
+                    {% include 'partials/project_embed_fields_inner.html' with context %}
+                </div>
+            </fieldset>
 
-        <input type="radio" id="method_full" name="embed_method" value="full" 
-               hx-get="/projects/settings/embed-fields/{{ project_name }}" 
-               hx-target="#project-embed-fields-wrapper"
-               {% if config.embed_method == 'full' %}checked{% endif %}>
-        <label for="method_full">Full Context</label>
-    </div>
-
-    <div id="project-embed-fields-wrapper" aria-live="polite">
-        {% include 'partials/project_embed_fields_inner.html' with context %}
-    </div>
-</fieldset>
             <div class="modal-actions" style="margin-top: 2rem;">
                 <button type="submit" class="btn-save">Save Project Settings</button>
                 <button type="button" class="btn-cancel" onclick="document.getElementById('project-settings-modal').remove()">Close</button>
@@ -87,3 +99,12 @@
         </form>
     </div>
 </div>
+
+<script>
+function toggleEmbedKeyField(val) {
+    const container = document.getElementById('embed-api-key-container');
+    if (!container) return;
+    const localProviders = ['builtin', 'ollama'];
+    container.style.display = localProviders.includes(val) ? 'none' : 'block';
+}
+</script>

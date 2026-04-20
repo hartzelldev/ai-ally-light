@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Request, Form
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
+from typing import Optional
 from core.config_manager import manager
 from schemas.settings import ChatSettings, EmbeddingSettings
 
@@ -77,21 +78,36 @@ async def save_global_settings(
     # Chat Fields
     chat_provider: str = Form(...),
     chat_model: str = Form(...),
-    chat_base_url: str = Form(...),
-    temperature: float = Form(...),
-    chat_api_key: str = Form(None),
-    # Embedding Fields
+    chat_base_url: str = Form(""), # Changed to allow empty string
+    temperature: float = Form(0.7),
+    chat_api_key: Optional[str] = Form(None),
+    
+    # Embedding Provider Fields
+    embed_provider: str = Form(...),
+    embed_model: Optional[str] = Form(None),
+        embed_base_url: Optional[str] = Form(None),
+    embed_api_key: Optional[str] = Form(None),
+    
+    # Existing Embedding Strategy Fields
     embed_method: str = Form("size"),
-    chunk_size: int = Form(500),
-    chunk_overlap: int = Form(50),
-    top_k: int = Form(5),
-    delimiter: str = Form("\n\n")
+    chunk_size: Optional[int] = Form(500),
+    chunk_overlap: Optional[int] = Form(50),
+    top_k: Optional[int] = Form(5),
+    delimiter: Optional[str] = Form("\n\n")
 ):
     """
     Validates and saves all settings.
     Updates config.json for general settings and .env for sensitive keys.
     """
-    # 1. Update Chat Settings
+    
+    # 1. Logic for Built-in Embedding Model name
+    final_embed_model = embed_model
+    if embed_provider == "builtin":
+        final_embed_model = "all-MiniLM-L6-v2"
+    elif not final_embed_model:
+        final_embed_model = "nomic-embed-text" # Standard default fallback
+
+    # 2. Update Chat Settings
     new_chat = ChatSettings(
         provider=chat_provider,
         model=chat_model,
@@ -99,8 +115,11 @@ async def save_global_settings(
         temperature=temperature
     )
     
-    # 2. Update Embedding Settings
+    # 3. Update Embedding Settings 
     new_embed = EmbeddingSettings(
+        provider=embed_provider, 
+        model=final_embed_model, 
+        base_url=embed_base_url,
         method=embed_method,
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,
@@ -108,16 +127,21 @@ async def save_global_settings(
         delimiter=delimiter
     )
     
-    # 3. Update master config object
+    # 4. Update master config object
     current_config = manager.config
     current_config.chat = new_chat
     current_config.embeddings = new_embed
     
-    # 4. Save to config.json
+    # 5. Save to config.json
     manager.save_config(current_config)
     
-    # 5. Save API Key to .env if provided
+    # 6. Save API Keys to .env if provided
     if chat_api_key:
         manager.save_api_key(chat_provider, chat_api_key)
     
-    return "<span class='success' role='alert' style='color: green; font-weight: bold;'>Settings and API Keys Saved Successfully!</span>"
+    if embed_api_key:
+        # Assuming your manager has a way to save the embedding key specifically
+        manager.save_api_key("embeddings", embed_api_key)
+    
+    return "<span class='success' role='alert' style='color: green; font-weight: bold;'>Global Settings and API Keys Saved Successfully!</span>"
+    

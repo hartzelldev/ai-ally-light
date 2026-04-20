@@ -1,24 +1,44 @@
 import chromadb
-from chromadb.utils import embedding_functions
 from pathlib import Path
 from typing import List
 
-# Use a local, high-quality embedding model that runs on your CPU
-# This downloads once on the first run (approx 80MB)
-default_ef = embedding_functions.SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2")
-
-def get_vector_db(project_name: str):
-    """Initializes or connects to a local ChromaDB for a specific project."""
+def get_vector_db(project_name: str, config: dict):
+    """
+    Initializes or connects to a local ChromaDB for a specific project.
+    Lazy-loads the embedding function based on the project configuration.
+    """
     project_path = Path("projects") / project_name
     db_path = project_path / "chroma_db"
     
+    # 1. Determine which embedding function to use based on config
+    provider = config.get("embed_provider", "builtin")
+
+    if provider == "builtin":
+        # We import and initialize ONLY if the user is using the local model
+        from chromadb.utils import embedding_functions
+        selected_ef = embedding_functions.SentenceTransformerEmbeddingFunction(
+            model_name="all-MiniLM-L6-v2"
+        )
+    else:
+        # If you've built a cloud provider logic in providers/embeddings.py, call it here.
+        # For now, we'll import it locally to keep startup fast.
+        try:
+            from providers.embeddings import get_remote_embedding_function
+            selected_ef = get_remote_embedding_function(config)
+        except ImportError:
+            # Fallback if the remote provider logic isn't ready yet
+            from chromadb.utils import embedding_functions
+            selected_ef = embedding_functions.SentenceTransformerEmbeddingFunction(
+                model_name="all-MiniLM-L6-v2"
+            )
+
     # Persistent client saves data to disk inside the project folder
     client = chromadb.PersistentClient(path=str(db_path))
     
-    # 'get_or_create' ensures we don't error out if it exists
+    # Use the selected_ef instead of the old global default_ef
     return client.get_or_create_collection(
         name=f"{project_name}_collection",
-        embedding_function=default_ef
+        embedding_function=selected_ef
     )
 
 def chunk_text(text: str, config: dict) -> List[str]:
@@ -51,7 +71,7 @@ def chunk_text(text: str, config: dict) -> List[str]:
 
 def index_file_chunks(project_name: str, filename: str, chunks: list):
     """Takes a list of strings and saves them into the vector database."""
-    collection = get_vector_db(project_name)
+    config = get_active_config(project_name)
     
     # Generate unique IDs for every chunk (e.g., "bio.txt_0", "bio.txt_1")
     ids = [f"{filename}_{i}" for i in range(len(chunks))]
@@ -66,7 +86,7 @@ def index_file_chunks(project_name: str, filename: str, chunks: list):
 
 def delete_file_from_index(project_name: str, filename: str):
     """Removes all chunks associated with a specific filename."""
-    collection = get_vector_db(project_name)
+    config = get_active_config(project_name)
     # We use the metadata 'source' we set during indexing
     collection.delete(where={"source": filename})
 

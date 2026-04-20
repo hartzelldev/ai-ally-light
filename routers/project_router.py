@@ -193,14 +193,16 @@ async def save_project_settings(
     project_name: str, 
     chat_provider: str = Form(...),
     chat_model: str = Form(...),
-    chat_api_key: str = Form(None),
-    temperature: float = Form(...),
-    system_prompt: str = Form(...),
+    chat_api_key: Optional[str] = Form(None),
+    # Added a default for temperature to prevent validation errors
+    temperature: float = Form(0.7),
+    # Added a default for system_prompt
+    system_prompt: str = Form(""),
     embed_provider: str = Form(...),
-    embed_model: str = Form(...),
-    embed_api_key: str = Form(None),
+    # CHANGE: embed_model must be Optional since the HTML might hide/omit it
+    embed_model: Optional[str] = Form(None),
+    embed_api_key: Optional[str] = Form(None),
     embed_method: str = Form(...),
-    # Added = Form(None) to prevent 422 errors when these fields are hidden
     chunk_size: Optional[int] = Form(None),
     chunk_overlap: Optional[int] = Form(None),
     delimiter: Optional[str] = Form(None)
@@ -209,14 +211,23 @@ async def save_project_settings(
     config_path = project_path / "project_config.json"
     project_env = project_path / ".env"
     
-    # We build the dictionary, ensuring we handle the potentially missing fields
+    # LOGIC: If the user chose the built-in model, we force the model name here
+    # since the HTML form won't be sending it.
+    final_embed_model = embed_model
+    if embed_provider == "builtin":
+        final_embed_model = "all-MiniLM-L6-v2"
+    elif not final_embed_model:
+        # Fallback for other providers if no model was specified
+        final_embed_model = "nomic-embed-text" # Or your preferred default
+
+    # We build the dictionary with the validated/defaulted values
     overrides = {
         "chat_provider": chat_provider,
         "chat_model": chat_model,
         "temperature": temperature,
         "system_prompt": system_prompt,
         "embed_provider": embed_provider,
-        "embed_model": embed_model,
+        "embed_model": final_embed_model,
         "embed_method": embed_method,
         "chunk_size": chunk_size,
         "chunk_overlap": chunk_overlap,
@@ -238,11 +249,10 @@ async def save_project_settings(
         with open(project_env, "w") as f:
             f.writelines(env_lines)
     elif project_env.exists():
-        # Optional: clear the file if no keys are provided
+        # Clean up if keys were removed
         project_env.unlink()
 
-    # SUCCESS: Return the HX-Redirect header to refresh the dashboard
-    # This is moved outside the 'if env_lines' block so it always runs
+    # Success: Send the HX-Redirect to close the modal and refresh
     return Response(
         headers={"HX-Redirect": f"/projects/open/{project_name}"}
     )

@@ -1,0 +1,18 @@
+<div id="embed-api-key-container" 
+     class="settings-group" 
+     style="display: {% if config.embed_provider in ['builtin', 'ollama'] %}none{% else %}block{% endif %};">
+    
+    <label for="embed_base_url">Embeddings Base URL:</label>
+    <input type="text" 
+           id="embed_base_url" 
+           name="embed_base_url" 
+           placeholder="e.g., https://api.openrouter.ai/v1"
+           value="{{ config.embed_base_url or '' }}">
+
+    <label for="embed_api_key" style="margin-top: 1rem; display: block;">Embeddings API Key:</label>
+    <input type="password" 
+           id="embed_api_key" 
+           name="embed_api_key" 
+           placeholder="Enter API Key"
+           value="{{ config.embed_api_key or '' }}">
+</div>
