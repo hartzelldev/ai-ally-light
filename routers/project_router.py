@@ -7,7 +7,7 @@ import shutil
 import json
 from dotenv import load_dotenv
 from typing import Optional
-from core.config_manager import manager
+from core.config_manager import manager, get_active_config
 from providers.chat import CHAT_PROVIDERS
 from providers.embeddings import EMBED_PROVIDERS
 from core.indexer import chunk_text, index_file_chunks, delete_file_from_index, clear_entire_index
@@ -22,59 +22,23 @@ PROJECTS_DIR.mkdir(exist_ok=True)
 
 # --- HELPERS ---
 
-def get_active_config(project_name: str):
-    """Helper to get the merged global and local project settings."""
-    project_path = PROJECTS_DIR / project_name
-    config_path = project_path / "project_config.json"
-    project_env = project_path / ".env"
-    
-    # 1. Start with Global Defaults
-    active_config = {
-        "chat_provider": manager.config.chat.provider,
-        "chat_model": manager.config.chat.model,
-        "temperature": manager.config.chat.temperature,
-        "system_prompt": manager.config.chat.system_prompt,
-        "embed_provider": manager.config.embeddings.provider,
-        "embed_model": manager.config.embeddings.model,
-        "embed_method": manager.config.embeddings.method,
-        "chunk_size": manager.config.embeddings.chunk_size,
-        "chunk_overlap": manager.config.embeddings.chunk_overlap,
-        "delimiter": getattr(manager.config.embeddings, 'delimiter', '\n\n')
-    }
-    
-    # 2. Load Environment Keys (if they exist)
-    if project_env.exists():
-        load_dotenv(project_env, override=True)
-        active_config["chat_api_key"] = os.getenv("PROJECT_CHAT_API_KEY", "")
-        active_config["embed_api_key"] = os.getenv("PROJECT_EMBED_API_KEY", "")
-
-    # 3. Apply Local JSON Overrides
-    if config_path.exists():
-        try:
-            with open(config_path, "r") as f:
-                active_config.update(json.load(f))
-        except Exception:
-            pass
-            
-    return active_config
-
 def get_project_files(project_name: str):
-    """Helper to list files in the project directory."""
-    project_path = PROJECTS_DIR / project_name
+    """Helper to list files in the project's dedicated files directory."""
+    project_files_path = PROJECTS_DIR / project_name / "files"
     files_info = []
     
-    # Ignore internal configuration and database files
-    ignore_list = [".env", "project_config.json", "embeddings.db"]
+    ignore_list = [".env", "project_config.json", "embeddings.db", "history.db"]
     
-    if not project_path.exists():
+    if not project_files_path.exists():
         return []
 
-    for item in project_path.iterdir():
+    for item in project_files_path.iterdir():
         if item.is_file() and item.name not in ignore_list:
             files_info.append({
                 "name": item.name,
                 "size_kb": round(item.stat().st_size / 1024, 2)
             })
+            
     return files_info
 
 # --- PROJECT MANAGEMENT ---
@@ -94,35 +58,19 @@ async def create_project(project_name: str = Form(...)):
     new_path = PROJECTS_DIR / folder_name
     if not new_path.exists():
         new_path.mkdir()
+        # Automatically create the 'files' subfolder on creation
+        (new_path / "files").mkdir(exist_ok=True)
     return Response(headers={"HX-Refresh": "true"})
 
 @router.get("/open/{project_name}", response_class=HTMLResponse)
 async def open_project(request: Request, project_name: str):
     project_path = PROJECTS_DIR / project_name
-    config_path = project_path / "project_config.json"
-    project_env = project_path / ".env"
     
-    # 1. Initialize the project-specific database
     db = ProjectDatabase(project_path) 
-    
-    if project_env.exists():
-        load_dotenv(project_env, override=True)
-    
     active_config = get_active_config(project_name)    
-    if config_path.exists():
-        try:
-            with open(config_path, "r") as f:
-                active_config.update(json.load(f))
-        except Exception:
-            pass
 
-    # 2. Handle Thread Loading
-    # Use the 'max_shown_threads' from the loaded config, defaulting to 10
     thread_limit = active_config.get("max_shown_threads", 10)
     threads = db.get_threads(limit=thread_limit)
-    
-    # Logic for the "Show More" button: 
-    # If we retrieved exactly the limit, there's a high chance more exist.
     has_more = len(threads) >= thread_limit
 
     display_name = project_name.replace("_", " ").title()
@@ -138,8 +86,8 @@ async def open_project(request: Request, project_name: str):
             "chat_providers": CHAT_PROVIDERS,
             "embed_providers": EMBED_PROVIDERS,
             "files": files,
-            "threads": threads,      # New context variable
-            "has_more": has_more     # New context variable
+            "threads": threads,
+            "has_more": has_more 
         }
     )
 
@@ -277,116 +225,104 @@ async def save_project_settings(
 async def list_files(request: Request, project_name: str):
     files = get_project_files(project_name)
     return templates.TemplateResponse(
-        request,  # <--- Added this as a positional argument
-        name="partials/file_list_inner.html", 
+        request=request,
+        name="partials/file_list_inner.html",
         context={"request": request, "project_name": project_name, "files": files}
     )
 
 @router.post("/files/upload/{project_name}")
 async def upload_file(request: Request, project_name: str, file: UploadFile = File(...)):
     project_path = PROJECTS_DIR / project_name
-    save_path = project_path / file.filename
+    upload_dir = project_path / "files"
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    save_path = upload_dir / file.filename
     
-    # 1. Save the actual file to disk
+    # 1. Save the file
     with open(save_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
     
-# 2. Get the config
-    active_config = get_active_config(project_name) 
+    # 2. Get the config MANUALLY
+    active_config = {}
+    config_path = project_path / "project_config.json"
+    if config_path.exists():
+        with open(config_path, "r") as f:
+            active_config = json.load(f)
+    
+    # Set defaults if missing
+    c_size = active_config.get("chunk_size") or 500
+    c_overlap = active_config.get("chunk_overlap") or 50
 
     # 3. Process and Index
     try:
         content = save_path.read_text(encoding="utf-8", errors="ignore")
-        
-        # Match 'active_config' here
-        chunks = chunk_text(content, active_config) 
-        
-        # Capture the return value so 'num_indexed' actually exists
+        # We use the raw variables here to be safe
+        chunks = chunk_text(content, {"chunk_size": c_size, "chunk_overlap": c_overlap}) 
         num_indexed = index_file_chunks(project_name, file.filename, chunks)
-        
         print(f"Success: {file.filename} indexed into {num_indexed} chunks.")
     except Exception as e:
         print(f"Indexing failed for {file.filename}: {e}")
+
     # 4. Refresh the UI
     files = get_project_files(project_name)
     return templates.TemplateResponse(
-        request, 
+        request=request,
         name="partials/file_list_inner.html",
         context={"request": request, "project_name": project_name, "files": files}
     )
 
 @router.delete("/files/delete/{project_name}/{filename}")
 async def delete_file(request: Request, project_name: str, filename: str):
-    file_path = PROJECTS_DIR / project_name / filename
+    # FIX: Look in the 'files' subfolder
+    file_path = PROJECTS_DIR / project_name / "files" / filename
     if file_path.exists():
         file_path.unlink()
+        delete_file_from_index(project_name, filename)
     
-    # After deleting, we fetch the new list and return the same partial
     files = get_project_files(project_name)
     return templates.TemplateResponse(
-        request, 
+        request=request,
         name="partials/file_list_inner.html",
         context={"request": request, "project_name": project_name, "files": files}
     )
-    
 
 @router.post("/files/reindex/{project_name}/{filename}")
 async def reindex_file(request: Request, project_name: str, filename: str):
-    project_path = PROJECTS_DIR / project_name
-    file_path = project_path / filename
+    # FIX: Look in the 'files' subfolder
+    file_path = PROJECTS_DIR / project_name / "files" / filename
     
     if file_path.exists():
-        # 1. Clear old data
         delete_file_from_index(project_name, filename)
-        
-        # 2. Re-index with current settings
         active_config = get_active_config(project_name)
         content = file_path.read_text(encoding="utf-8", errors="ignore")
         chunks = chunk_text(content, active_config)
         index_file_chunks(project_name, filename, chunks)
-        print(f"Reindexed: {filename} into {len(chunks)} chunks.")
 
     files = get_project_files(project_name)
     return templates.TemplateResponse(
-        request, 
+        request=request,
         name="partials/file_list_inner.html",
         context={"request": request, "project_name": project_name, "files": files}
     )
 
 @router.post("/reindex-all/{project_name}")
 async def reindex_all(request: Request, project_name: str):
-    # 1. Nuke the whole DB
     clear_entire_index(project_name)
-    
-    # 2. Loop through all files on disk and index them
     active_config = get_active_config(project_name)
-    project_path = PROJECTS_DIR / project_name
     
-    for file_path in project_path.iterdir():
-        # Only index common text files to avoid binary junk
-        if file_path.suffix in ['.txt', '.md', '.json', '.log']:
-            content = file_path.read_text(encoding="utf-8", errors="ignore")
-            chunks = chunk_text(content, active_config)
-            index_file_chunks(project_name, file_path.name, chunks)
-            print(f"Reindexed: {file_path.name}")
+    # FIX: Iterate through the 'files' subfolder
+    files_dir = PROJECTS_DIR / project_name / "files"
+    
+    if files_dir.exists():
+        for file_path in files_dir.iterdir():
+            if file_path.suffix in ['.txt', '.md', '.json', '.log']:
+                content = file_path.read_text(encoding="utf-8", errors="ignore")
+                chunks = chunk_text(content, active_config)
+                index_file_chunks(project_name, file_path.name, chunks)
 
     files = get_project_files(project_name)
     return templates.TemplateResponse(
-        request, 
+        request=request,
         name="partials/file_list_inner.html",
         context={"request": request, "project_name": project_name, "files": files}
     )
-
-@router.get("/settings/embed-fields/{project_name}")
-async def get_project_embed_fields(request: Request, project_name: str, embed_method: str):
-    # Fetch existing config
-    config = get_active_config(project_name)
     
-    # Update the method in the config object passed to the template
-    config['embed_method'] = embed_method
-    
-    return templates.TemplateResponse(
-        request,
-        name="partials/project_embed_fields_inner.html",
-        context={"request": request, "config": config}
-    )

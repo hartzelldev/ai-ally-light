@@ -1,6 +1,8 @@
 import chromadb
 from pathlib import Path
 from typing import List
+from core.config_manager import get_active_config
+
 
 def get_vector_db(project_name: str, config: dict):
     """
@@ -70,25 +72,41 @@ def chunk_text(text: str, config: dict) -> List[str]:
     return chunks
 
 def index_file_chunks(project_name: str, filename: str, chunks: list):
-    """Takes a list of strings and saves them into the vector database."""
-    config = get_active_config(project_name)
+    """Indexes text chunks into the vector database."""
+    # 1. Establish the connection inside this function
+    persist_directory = f"projects/{project_name}/embeddings"
+    client = chromadb.PersistentClient(path=persist_directory)
     
-    # Generate unique IDs for every chunk (e.g., "bio.txt_0", "bio.txt_1")
+    # 2. Define 'collection'
+    collection = client.get_or_create_collection(name=project_name)
+    
+    # 3. Now the rest of your indexing logic will work
     ids = [f"{filename}_{i}" for i in range(len(chunks))]
-    metadatas = [{"source": filename} for _ in range(len(chunks))]
+    metadatas = [{"source": filename} for _ in chunks]
     
     collection.add(
         documents=chunks,
-        metadatas=metadatas,
-        ids=ids
+        ids=ids,
+        metadatas=metadatas
     )
     return len(chunks)
 
 def delete_file_from_index(project_name: str, filename: str):
-    """Removes all chunks associated with a specific filename."""
+    # 1. Get the configuration (We just moved this to config_manager)
     config = get_active_config(project_name)
-    # We use the metadata 'source' we set during indexing
+    
+    # 2. Initialize the Chroma client
+    # (Using the path logic you have elsewhere in the project)
+    persist_directory = f"projects/{project_name}/embeddings"
+    client = chromadb.PersistentClient(path=persist_directory)
+    
+    # 3. GET the collection (This defines the 'collection' variable)
+    collection = client.get_or_create_collection(name=project_name)
+    
+    # 4. Now 'collection' is defined and you can run the delete
     collection.delete(where={"source": filename})
+    print(f"Removed {filename} from vector index.")
+
 
 def clear_entire_index(project_name: str):
     """Nukes the entire collection for a project."""

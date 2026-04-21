@@ -71,3 +71,39 @@ class ConfigManager:
 
 # Create a singleton instance
 manager = ConfigManager()
+
+def get_active_config(project_name: str):
+    """Helper to get the merged global and local project settings."""
+    # We define PROJECTS_DIR here locally to be safe
+    projects_dir = Path("projects")
+    project_path = projects_dir / project_name
+    config_path = project_path / "project_config.json"
+    project_env = project_path / ".env"
+    
+    # Use the 'manager' object that's already in this file
+    active_config = {
+        "chat_provider": manager.config.chat.provider,
+        "chat_model": manager.config.chat.model,
+        "temperature": manager.config.chat.temperature,
+        "system_prompt": manager.config.chat.system_prompt,
+        "embed_provider": manager.config.embeddings.provider,
+        "embed_model": manager.config.embeddings.model,
+        "embed_method": manager.config.embeddings.method,
+        "chunk_size": manager.config.embeddings.chunk_size,
+        "chunk_overlap": manager.config.embeddings.chunk_overlap,
+    }
+    
+    if project_env.exists():
+        load_dotenv(project_env, override=True)
+        active_config["chat_api_key"] = os.getenv("PROJECT_CHAT_API_KEY", "")
+        active_config["embed_api_key"] = os.getenv("PROJECT_EMBED_API_KEY", "")
+
+    if config_path.exists():
+        try:
+            with open(config_path, "r") as f:
+                active_config.update(json.load(f))
+        except Exception:
+            pass
+            
+    return active_config
+    
