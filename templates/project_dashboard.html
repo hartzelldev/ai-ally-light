@@ -1,8 +1,8 @@
-<div id="project-scope">
+<div id="main-content">
     <header>
         <h1>Project: {{ display_name }}</h1>
         <nav aria-label="Project Actions">
-            <button hx-get="/projects/settings/{{ project_name }}" hx-target="#modal-container">Project Settings</button>
+            <button hx-get="/projects/settings/{{ project_name }}" hx-target="#modal-container" hx-swap="innerHTML">Project Settings</button>
             <button hx-get="/projects/rename-prompt/{{ project_name }}" hx-target="#modal-container">Rename</button>
 			<button class="btn-warning" 
 				hx-post="/projects/reindex-all/{{ project_name }}"
@@ -73,3 +73,5 @@
 
     </div>
 </div>
+
+<div id="modal-container"></div>

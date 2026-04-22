@@ -180,10 +180,10 @@ async def save_project_settings(
         final_embed_model = "all-MiniLM-L6-v2"
     elif not final_embed_model:
         # Fallback for other providers if no model was specified
-        final_embed_model = "nomic-embed-text" # Or your preferred default
+        final_embed_model = "nomic-embed-text" 
 
-    # We build the dictionary with the validated/defaulted values
-    overrides = {
+    # 1. Build the dictionary with the validated/defaulted values
+    raw_overrides = {
         "chat_provider": chat_provider,
         "chat_model": chat_model,
         "temperature": temperature,
@@ -196,15 +196,23 @@ async def save_project_settings(
         "delimiter": delimiter
     }
     
-    # Write the JSON config
+    # 2. THE FIX: Filter out any keys that are empty strings or None.
+    # This ensures that empty UI fields don't overwrite global defaults with blanks.
+    # We use 'is not None' and '!= ""' to be explicit.
+    final_overrides = {
+        k: v for k, v in raw_overrides.items() 
+        if v is not None and str(v).strip() != ""
+    }
+    
+    # 3. Write the JSON config
     with open(config_path, "w") as f:
-        json.dump(overrides, f, indent=4)
+        json.dump(final_overrides, f, indent=4)
 
-    # Handle the .env file for API keys
+    # 4. Handle the .env file for API keys
     env_lines = []
-    if chat_api_key:
+    if chat_api_key and chat_api_key.strip() != "":
         env_lines.append(f"PROJECT_CHAT_API_KEY={chat_api_key}\n")
-    if embed_api_key:
+    if embed_api_key and embed_api_key.strip() != "":
         env_lines.append(f"PROJECT_EMBED_API_KEY={embed_api_key}\n")
         
     if env_lines:
@@ -325,4 +333,24 @@ async def reindex_all(request: Request, project_name: str):
         name="partials/file_list_inner.html",
         context={"request": request, "project_name": project_name, "files": files}
     )
+
+@router.get("/settings/embed-fields/{project_name}")
+async def get_project_embed_fields(request: Request, project_name: str, embed_method: str):
+    # Use the shared helper we moved to core/config_manager.py
+    from core.config_manager import get_active_config
     
+    config = get_active_config(project_name)
+    
+    # Manually override with the selection from the radio button 
+    # so the partial template renders the correct fields
+    config['embed_method'] = embed_method
+    
+    return templates.TemplateResponse(
+        request=request,
+        name="partials/project_embed_fields_inner.html",
+        context={
+            "request": request, 
+            "config": config, 
+            "project_name": project_name
+        }
+    )
