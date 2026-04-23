@@ -1,66 +1,75 @@
 import chromadb
 from pathlib import Path
 from typing import List
-from core.config_manager import get_active_config
-
+from core.config_manager import get_active_config, PROJECTS_DIR
 
 def get_vector_db(project_name: str, config: dict):
     """
     Initializes or connects to a local ChromaDB for a specific project.
-    Lazy-loads the embedding function based on the project configuration.
+    Standardizes on the 'embeddings' directory within the project folder.
     """
-    project_path = Path("projects") / project_name
-    db_path = project_path / "chroma_db"
+    # PATH FIX: Standardizing on projects/[name]/embeddings
+    db_path = PROJECTS_DIR / project_name / "embeddings"
     
-    # 1. Determine which embedding function to use based on config
     provider = config.get("embed_provider", "builtin")
 
     if provider == "builtin":
-        # We import and initialize ONLY if the user is using the local model
         from chromadb.utils import embedding_functions
         selected_ef = embedding_functions.SentenceTransformerEmbeddingFunction(
             model_name="all-MiniLM-L6-v2"
         )
     else:
-        # If you've built a cloud provider logic in providers/embeddings.py, call it here.
-        # For now, we'll import it locally to keep startup fast.
         try:
             from providers.embeddings import get_remote_embedding_function
             selected_ef = get_remote_embedding_function(config)
         except ImportError:
-            # Fallback if the remote provider logic isn't ready yet
             from chromadb.utils import embedding_functions
             selected_ef = embedding_functions.SentenceTransformerEmbeddingFunction(
                 model_name="all-MiniLM-L6-v2"
             )
 
-    # Persistent client saves data to disk inside the project folder
     client = chromadb.PersistentClient(path=str(db_path))
     
-    # Use the selected_ef instead of the old global default_ef
+    # We name the collection after the project for consistency
     return client.get_or_create_collection(
-        name=f"{project_name}_collection",
+        name=project_name,
         embedding_function=selected_ef
     )
 
-def chunk_text(text: str, config: dict) -> List[str]:
+def query_vector_db(project_name: str, query_text: str, n_results: int = 5):
     """
-    Breaks text into pieces based on the user's project settings.
+    Called by chat_router.py to find relevant context for the AI.
     """
-    method = config.get("embed_method", "Fixed Size")
+    config = get_active_config(project_name)
+    # This ensures we use the SAME embedding function used during indexing
+    collection = get_vector_db(project_name, config)
     
-    if method == "Full File":
+    results = collection.query(
+        query_texts=[query_text],
+        n_results=n_results
+    )
+    
+    if results['documents'] and len(results['documents'][0]) > 0:
+        return "\n---\n".join(results['documents'][0])
+    
+    return "No specific project context found."
+
+def chunk_text(text: str, config: dict) -> List[str]:
+    """Breaks text into pieces based on the user's project settings."""
+    # Logic mapping display names to the internal strategy
+    method = config.get("embed_method", "size") 
+    
+    if method == "full":
         return [text]
 
-    if method == "Delimiter":
-        # Uses the delimiter from settings, or defaults to double newline
+    if method == "delimiter":
         delimiter = config.get("delimiter", "\n\n")
         chunks = text.split(delimiter)
         return [c.strip() for c in chunks if c.strip()]
 
-    # Default: Fixed Size (Character based)
-    size = int(config.get("chunk_size", 500))
-    overlap = int(config.get("chunk_overlap", 50))
+    # Default: Size (Character based)
+    size = int(config.get("chunk_size") or 500)
+    overlap = int(config.get("chunk_overlap") or 50)
     
     chunks = []
     start = 0
@@ -73,14 +82,9 @@ def chunk_text(text: str, config: dict) -> List[str]:
 
 def index_file_chunks(project_name: str, filename: str, chunks: list):
     """Indexes text chunks into the vector database."""
-    # 1. Establish the connection inside this function
-    persist_directory = f"projects/{project_name}/embeddings"
-    client = chromadb.PersistentClient(path=persist_directory)
+    config = get_active_config(project_name)
+    collection = get_vector_db(project_name, config)
     
-    # 2. Define 'collection'
-    collection = client.get_or_create_collection(name=project_name)
-    
-    # 3. Now the rest of your indexing logic will work
     ids = [f"{filename}_{i}" for i in range(len(chunks))]
     metadatas = [{"source": filename} for _ in chunks]
     
@@ -92,30 +96,17 @@ def index_file_chunks(project_name: str, filename: str, chunks: list):
     return len(chunks)
 
 def delete_file_from_index(project_name: str, filename: str):
-    # 1. Get the configuration (We just moved this to config_manager)
+    """Removes a specific file's data from the index."""
     config = get_active_config(project_name)
-    
-    # 2. Initialize the Chroma client
-    # (Using the path logic you have elsewhere in the project)
-    persist_directory = f"projects/{project_name}/embeddings"
-    client = chromadb.PersistentClient(path=persist_directory)
-    
-    # 3. GET the collection (This defines the 'collection' variable)
-    collection = client.get_or_create_collection(name=project_name)
-    
-    # 4. Now 'collection' is defined and you can run the delete
+    collection = get_vector_db(project_name, config)
     collection.delete(where={"source": filename})
-    print(f"Removed {filename} from vector index.")
-
 
 def clear_entire_index(project_name: str):
     """Nukes the entire collection for a project."""
-    project_path = Path("projects") / project_name
-    db_path = project_path / "chroma_db"
-    
-    # Simple way: connect and delete the collection
+    db_path = PROJECTS_DIR / project_name / "embeddings"
     client = chromadb.PersistentClient(path=str(db_path))
     try:
-        client.delete_collection(name=f"{project_name}_collection")
+        client.delete_collection(name=project_name)
     except Exception:
-        pass # Collection might not exist yet
+        pass
+        

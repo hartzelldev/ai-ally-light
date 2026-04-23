@@ -8,6 +8,7 @@ from schemas.settings import GlobalConfig
 BASE_DIR = Path(__file__).resolve().parent.parent
 CONFIG_PATH = BASE_DIR / "config.json"
 ENV_PATH = BASE_DIR / ".env"
+PROJECTS_DIR = Path("projects")
 
 class ConfigManager:
     def __init__(self):
@@ -73,37 +74,45 @@ class ConfigManager:
 manager = ConfigManager()
 
 def get_active_config(project_name: str):
-    """Helper to get the merged global and local project settings."""
-    # We define PROJECTS_DIR here locally to be safe
-    projects_dir = Path("projects")
-    project_path = projects_dir / project_name
-    config_path = project_path / "project_config.json"
-    project_env = project_path / ".env"
-    
-    # Use the 'manager' object that's already in this file
-    active_config = {
-        "chat_provider": manager.config.chat.provider,
-        "chat_model": manager.config.chat.model,
-        "temperature": manager.config.chat.temperature,
-        "system_prompt": manager.config.chat.system_prompt,
-        "embed_provider": manager.config.embeddings.provider,
-        "embed_model": manager.config.embeddings.model,
-        "embed_method": manager.config.embeddings.method,
-        "chunk_size": manager.config.embeddings.chunk_size,
-        "chunk_overlap": manager.config.embeddings.chunk_overlap,
-    }
-    
-    if project_env.exists():
-        load_dotenv(project_env, override=True)
-        active_config["chat_api_key"] = os.getenv("PROJECT_CHAT_API_KEY", "")
-        active_config["embed_api_key"] = os.getenv("PROJECT_EMBED_API_KEY", "")
+    """
+    Helper to get the merged global and local project settings.
+    This ensures project-specific models override global ones.
+    """
+    import json
+    from pathlib import Path
 
-    if config_path.exists():
+    # 1. Setup paths
+    projects_dir = Path("projects")
+    global_config_path = Path("config.json")
+    project_config_path = projects_dir / project_name / "project_config.json"
+
+    # 2. Start with a baseline dictionary of defaults
+    # This prevents crashes if config.json is missing
+    active_config = {
+        "chat_provider": "openrouter",
+        "chat_model": "google/gemini-2.0-flash-001",
+        "temperature": 0.7
+    }
+
+    # 3. Load Global Settings (config.json)
+    if global_config_path.exists():
         try:
-            with open(config_path, "r") as f:
-                active_config.update(json.load(f))
-        except Exception:
-            pass
-            
+            with open(global_config_path, "r") as f:
+                global_data = json.load(f)
+                active_config.update(global_data)
+        except Exception as e:
+            print(f"Error loading global config: {e}")
+
+    # 4. Load Project-Specific Settings (project_config.json)
+    # This is where your new model name will overwrite the old global one
+    if project_config_path.exists():
+        try:
+            with open(project_config_path, "r") as f:
+                project_data = json.load(f)
+                active_config.update(project_data)
+                # Success! The project model now takes priority
+        except Exception as e:
+            print(f"Error loading project config for {project_name}: {e}")
+
     return active_config
     
