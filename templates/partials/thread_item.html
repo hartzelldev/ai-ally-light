@@ -1,20 +1,29 @@
-<li class="thread-item" id="thread-{{ thread.id }}">
+<li class="thread-item" id="thread-{{ thread.id }}" role="listitem">
     <a href="/chat/{{ project_name }}/{{ thread.id }}" 
        hx-get="/chat/{{ project_name }}/{{ thread.id }}"
        hx-target="#chat-window"
-       aria-label="Open thread: {{ thread.name }}">
-       {{ thread.name }}
+       class="thread-link"
+       aria-current="false">
+       <span class="visually-hidden">Open thread: </span>{{ thread.name }}
     </a>
     
     <div class="thread-controls">
         <button hx-get="/threads/rename-form/{{ project_name }}/{{ thread.id }}" 
                 hx-target="#thread-{{ thread.id }}"
-                aria-label="Rename {{ thread.name }}">✏️</button>
+                hx-swap="outerHTML"
+                title="Rename {{ thread.name }}"
+                aria-label="Rename thread: {{ thread.name }}">
+            <span aria-hidden="true">✏️</span>
+        </button>
                 
         <button hx-delete="/threads/delete/{{ project_name }}/{{ thread.id }}" 
-                hx-confirm="Are you sure you want to delete this entire thread?"
+                hx-confirm="Are you sure you want to delete the thread '{{ thread.name }}'?"
                 hx-target="#thread-{{ thread.id }}"
                 hx-swap="outerHTML"
-                aria-label="Delete {{ thread.name }}">🗑️</button>
+                title="Delete {{ thread.name }}"
+                aria-label="Delete thread: {{ thread.name }}"
+                style="color: #cc0000;">
+            <span aria-hidden="true">🗑️</span>
+        </button>
     </div>
 </li>

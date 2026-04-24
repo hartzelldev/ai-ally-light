@@ -3,9 +3,6 @@ from fastapi.responses import HTMLResponse
 from core.database_manager import ProjectDatabase
 from pathlib import Path
 import os
-from core.indexer import query_vector_db
-from core.config_manager import PROJECTS_DIR 
-import openai
 
 router = APIRouter(tags=["chat"])
 PROJECTS_DIR = Path("projects")
@@ -16,10 +13,9 @@ async def open_thread(request: Request, project_name: str, thread_id: int):
     project_path = PROJECTS_DIR / project_name
     db = ProjectDatabase(project_path)
     
-    # 1. Fetch messages from SQLite
+    # Fetch messages from SQLite
     messages = db.get_messages(thread_id)
     
-    # 2. Return a partial that updates the chat-log and the input form
     from app import templates
     return templates.TemplateResponse(
         request=request,
@@ -38,41 +34,35 @@ async def send_message(
     thread_id: int, 
     user_input: str = Form(...)
 ):
-    """
-    Processes a new message, saves to DB, queries RAG context, 
-    calls the appropriate LLM provider, and returns the AI response.
-    """
     # 1. Setup paths and database
-    # Assuming PROJECTS_DIR is imported at the top of your file
     project_path = PROJECTS_DIR / project_name
     db = ProjectDatabase(project_path)
     
     # 2. Save User Message to Database
     db.save_message(thread_id, role="user", content=user_input)
     
-    # 3. Load Project Configuration (Merged Global + Local)
+    # 3. Load Project Configuration
     from core.config_manager import get_active_config
     config = get_active_config(project_name)
     
-    # 4. Retrieval (RAG): Get context from the vector database
+    # 4. Retrieval (RAG)
     from core.indexer import query_vector_db
     try:
         context_text = query_vector_db(project_name, user_input)
     except Exception as e:
-        context_text = f"Error retrieving context: {str(e)}"
+        context_text = f"No additional context found. (Error: {str(e)})"
     
-    # 5. Initialize AI Logic using AIEngine
+    # 5. Initialize AI Logic
     from core.ai_logic import AIEngine
-    provider_name = config.get("chat_provider", "openrouter").lower()
     ai_engine = AIEngine(config=config)
     
-    # 6. Construct the messages for the LLM
+    # 6. Construct the messages (Updated for better RAG flow)
     system_prompt = config.get("system_prompt", "You are a helpful assistant.")
     
+    # We use a clean separator to help Mistral distinguish between your files and your question
     augmented_user_input = (
-        f"Use the following context from the project files to answer the user's question.\n"
-        f"Context:\n{context_text}\n\n"
-        f"User Question: {user_input}"
+        f"CONTEXT FROM PROJECT FILES:\n{context_text}\n\n"
+        f"USER QUESTION:\n{user_input}"
     )
     
     messages = [
@@ -84,12 +74,12 @@ async def send_message(
     try:
         ai_response = ai_engine.get_response(messages)
     except Exception as e:
-        ai_response = f"AI Error ({provider_name}): {str(e)}"
+        ai_response = f"AI Error: {str(e)}"
     
     # 8. Save AI Response to Database
     db.save_message(thread_id, role="assistant", content=ai_response)
     
-    # 9. Return the HTMX partial
+    # 9. Return the HTMX partial for the message pair
     from app import templates
     return templates.TemplateResponse(
         request=request,

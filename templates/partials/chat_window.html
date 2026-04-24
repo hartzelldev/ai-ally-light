@@ -1,35 +1,48 @@
-<div id="chat-log" 
-     role="log" 
-     aria-live="polite" 
-     aria-relevant="additions">
-    
-    {% for msg in messages %}
-        <section class="message {{ msg.role }}">
-            {% if msg.role == 'user' %}
-                <h3>You said:</h3>
-            {% else %}
-                <h3>Ally said:</h3>
-            {% endif %}
-            <p>{{ msg.content }}</p>
-        </section>
-        <hr aria-hidden="true">
-    {% endfor %}
-</div>
+<section id="chat-container" aria-label="Conversation with Ally">
+    <div id="chat-log" 
+         role="log" 
+         aria-live="polite" 
+         aria-relevant="additions"
+         style="max-height: 70vh; overflow-y: auto; padding: 1rem; border: 1px solid #ccc;">
+        
+        {% for msg in messages %}
+            <article class="message {{ msg.role }}" aria-label="{{ msg.role }} message">
+                {% if msg.role == 'user' %}
+                    <h3 class="visually-hidden">You said:</h3>
+                    <div class="message-content user-msg"><strong>You:</strong> {{ msg.content }}</div>
+                {% else %}
+                    <h3 class="visually-hidden">Ally said:</h3>
+                    <div class="message-content ally-msg"><strong>Ally:</strong> {{ msg.content }}</div>
+                {% endif %}
+            </article>
+            <hr aria-hidden="true">
+        {% endfor %}
+        
+        <div id="chat-end" tabindex="-1"></div>
+    </div>
 
     <div id="chat-input-area" style="margin-top: 1rem;">
         <form hx-post="/chat/send/{{ project_name }}/{{ thread_id }}" 
               hx-target="#chat-log" 
               hx-swap="beforeend"
-              hx-on::after-request="this.reset()">
+              hx-indicator="#chat-loading"
+              hx-on::after-request="this.reset(); document.getElementById('chat-end').scrollIntoView();">
             
             <label for="user_input">Type your message:</label>
             <textarea id="user_input" 
                       name="user_input" 
-                      rows="3" 
-                      style="width: 100%;" 
-                      required></textarea>
+                      rows="4" 
+                      style="width: 100%; margin-bottom: 0.5rem;" 
+                      required
+                      placeholder="Ask Ally about your scene..."></textarea>
             
-            <button type="submit">Send Message</button>
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <button type="submit" class="btn-action">Send Message</button>
+                
+                <div id="chat-loading" class="htmx-indicator" role="status">
+                    <span aria-live="assertive">Ally is thinking...</span>
+                </div>
+            </div>
         </form>
     </div>
 </section>

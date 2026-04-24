@@ -1,22 +1,22 @@
-<div id="main-content">
+<div class="project-dashboard">
     <header>
         <h1>Project: {{ display_name }}</h1>
         <nav aria-label="Project Actions">
-            <button hx-get="/projects/settings/{{ project_name }}" hx-target="#modal-container" hx-swap="innerHTML">Project Settings</button>
+            <button hx-get="/projects/settings/{{ project_name }}" hx-target="#modal-container">Project Settings</button>
             <button hx-get="/projects/rename-prompt/{{ project_name }}" hx-target="#modal-container">Rename</button>
-			<button class="btn-warning" 
-				hx-post="/projects/reindex-all/{{ project_name }}"
-				hx-confirm="This will rebuild the entire database using current settings. Proceed?"
-				hx-target="#file-list">
-					Reindex All Files
-			</button>
-			<button style="color: red;" 
-				hx-delete="/projects/delete/{{ project_name }}" 
-				hx-target="#main-content" 
-				hx-confirm="Are you sure you want to delete this project?">
-			Delete Project
-			</button>
-            <button hx-get="/projects/list" hx-target="#main-content">Back to All Projects</button>
+            <button class="btn-warning" 
+                hx-post="/projects/reindex-all/{{ project_name }}"
+                hx-confirm="This will rebuild the entire database using current settings. Proceed?"
+                hx-target="#file-list">
+                    Reindex All Files
+            </button>
+            <button style="color: red;" 
+                hx-delete="/projects/delete/{{ project_name }}" 
+                hx-target="body" 
+                hx-confirm="Are you sure you want to delete this project?">
+                Delete Project
+            </button>
+            <button hx-get="/projects/list" hx-target="#active-workspace">Back to All Projects</button>
         </nav>
     </header>
 
@@ -25,53 +25,53 @@
     <div style="display: flex; gap: 2rem;">
         <aside style="flex: 1;" role="complementary">
             <section id="threads-section">
-			<nav aria-labelledby="threads-header">
-			<h2 id="threads-header">Project Threads</h2>
-
-			<button hx-post="/threads/create/{{ project_name }}" 
-				hx-target="#thread-list" 
-				hx-swap="afterbegin"
-				class="btn-new-thread">
-			+ New Thread
-			</button>
-
-			<ul id="thread-list" class="thread-list">
-				{% for thread in threads %}
-					{% include "partials/thread_item.html" %}
-				{% endfor %}
-			</ul>
-
-			{% if has_more %}
-			<button id="show-more-threads" 
-				hx-get="/threads/list/{{ project_name }}?offset={{ threads|length }}" 
-				hx-target="this" 
-				hx-swap="outerHTML"
-				class="btn-link">
-			Show More Threads...
-			</button>
-			{% endif %}
-			</nav>
+                <nav aria-labelledby="threads-header">
+                    <h2 id="threads-header">Project Threads</h2>
+                    <button hx-post="/threads/create/{{ project_name }}" 
+                        hx-target="#thread-list" 
+                        hx-swap="afterbegin"
+                        class="btn-new-thread">
+                        + New Thread
+                    </button>
+                    <ul id="thread-list" class="thread-list" role="list">
+                        {% for thread in threads %}
+                            {% include "partials/thread_item.html" %}
+                        {% endfor %}
+                    </ul>
+                    {% if has_more %}
+                        <button id="show-more-threads" 
+                            hx-get="/threads/list/{{ project_name }}?offset={{ threads|length }}" 
+                            hx-target="this" 
+                            hx-swap="outerHTML"
+                            class="btn-link">
+                            Show More Threads...
+                        </button>
+                    {% endif %}
+                </nav>
             </section>
 
             <section id="files-section" style="margin-top: 2rem;">
                 <h2>Files & Indexing</h2>
-<form hx-encoding="multipart/form-data" 
-      hx-post="/projects/files/upload/{{ project_name }}" 
-      hx-target="#file-list"> <label for="file-upload">Upload Asset:</label>
-    <input type="file" id="file-upload" name="file">
-    <button type="submit">Upload</button>
-</form>
+                <form hx-encoding="multipart/form-data" 
+                      hx-post="/projects/files/upload/{{ project_name }}" 
+                      hx-target="#global-alert"
+                      hx-on::after-request="this.reset()"
+                      hx-trigger="submit"> 
+                    <label for="file-upload">Upload Asset:</label>
+                    <input type="file" id="file-upload" name="file">
+                    <button type="submit">Upload</button>
+                </form>
 
-<div id="file-list" 
-     hx-get="/projects/files/list/{{ project_name }}" 
-     hx-trigger="load">
-    </div>
+                <div id="file-list" 
+                     hx-get="/projects/files/list/{{ project_name }}" 
+                     hx-trigger="load, fileAdded from:body">
+                     <p>Loading files...</p>
+                </div>
+            </section>
+        </aside>
 
-<main id="chat-window">
-    <p>Select a thread from the sidebar to start chatting, or create a new one.</p>
-</main>
-
+        <main id="chat-window" style="flex: 2;" aria-live="polite">
+            <p>Select a thread from the sidebar to start chatting, or create a new one.</p>
+        </main>
     </div>
 </div>
-
-<div id="modal-container"></div>

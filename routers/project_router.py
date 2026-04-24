@@ -7,6 +7,7 @@ import shutil
 import json
 from dotenv import load_dotenv
 from typing import Optional
+import gc
 from core.config_manager import manager, get_active_config
 from providers.chat import CHAT_PROVIDERS
 from providers.embeddings import EMBED_PROVIDERS
@@ -91,22 +92,71 @@ async def open_project(request: Request, project_name: str):
         }
     )
 
+@router.get("/rename-prompt/{project_name}", response_class=HTMLResponse)
+async def get_rename_modal(request: Request, project_name: str):
+    """Returns the modal for renaming a project."""
+    # Clean up the name for the display (e.g., 'test14' -> 'Test14')
+    display_name = project_name.replace("_", " ").capitalize()
+    
+    from app import templates
+    return templates.TemplateResponse(
+        request=request,
+        name="partials/rename_modal.html",
+        context={
+            "project_name": project_name,
+            "display_name": display_name
+        }
+    )
+
 @router.post("/rename/{project_name}")
-async def rename_project(project_name: str, new_name: str = Form(...)):
+async def rename_project(request: Request, project_name: str, new_name: str = Form(...)):
+    """Handles the actual folder renaming on the filesystem."""
     new_folder_name = new_name.lower().replace(" ", "_")
     old_path = PROJECTS_DIR / project_name
     new_path = PROJECTS_DIR / new_folder_name
     
+    # Validation: Don't overwrite an existing project
     if not new_path.exists() and old_path.exists():
-        os.rename(old_path, new_path)
+        try:
+            os.rename(old_path, new_path)
+        except Exception as e:
+            # For your screen reader, you might want to return an error status here
+            return HTMLResponse(content=f"Error renaming folder: {str(e)}", status_code=500)
     
+    # After renaming, we tell HTMX to refresh the whole page 
+    # to update all sidebar links and header titles.
     return Response(headers={"HX-Refresh": "true"})
 
 @router.delete("/delete/{project_name}")
 async def delete_project(project_name: str):
     project_path = PROJECTS_DIR / project_name
+    
     if project_path.exists():
-        shutil.rmtree(project_path)
+        try:
+            # 1. If you have a global DB manager, tell it to close connections
+            # This is the most likely culprit.
+            from core.database_manager import ProjectDatabase
+            db = ProjectDatabase(project_path)
+            
+            # Explicitly close the connection if your class has a close method
+            if hasattr(db, 'close'):
+                db.close()
+            
+            # 2. Force Python to clear any lingering file handles
+            del db
+            gc.collect() 
+            
+            # 3. Now try to delete the folder
+            shutil.rmtree(project_path)
+            
+        except PermissionError:
+            return HTMLResponse(
+                content="<script>alert('Error: The database is still in use. Try navigating to Home first to release the file lock.');</script>", 
+                status_code=500
+            )
+        except Exception as e:
+            return HTMLResponse(content=f"Error: {str(e)}", status_code=500)
+
     return Response(headers={"HX-Refresh": "true"})
 
 # --- SETTINGS MANAGEMENT ---
