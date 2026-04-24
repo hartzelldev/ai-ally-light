@@ -6,7 +6,7 @@ import os
 import shutil
 import json
 from dotenv import load_dotenv
-from typing import Optional
+from typing import Optional, List
 import gc
 from core.config_manager import manager, get_active_config
 from providers.chat import CHAT_PROVIDERS
@@ -288,44 +288,68 @@ async def list_files(request: Request, project_name: str):
         context={"request": request, "project_name": project_name, "files": files}
     )
 
+
 @router.post("/files/upload/{project_name}")
-async def upload_file(request: Request, project_name: str, file: UploadFile = File(...)):
+async def upload_file(request: Request, project_name: str, file: List[UploadFile] = File(...)):
+    """Handles multiple file uploads and indexes them using project-specific settings."""
     project_path = PROJECTS_DIR / project_name
     upload_dir = project_path / "files"
     upload_dir.mkdir(parents=True, exist_ok=True)
-    save_path = upload_dir / file.filename
     
-    # 1. Save the file
-    with open(save_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-    
-    # 2. Get the config MANUALLY
+    # 1. Load the project configuration once for the whole batch
     active_config = {}
     config_path = project_path / "project_config.json"
     if config_path.exists():
         with open(config_path, "r") as f:
             active_config = json.load(f)
     
-    # Set defaults if missing
-    c_size = active_config.get("chunk_size") or 500
-    c_overlap = active_config.get("chunk_overlap") or 50
+    # Extract settings once
+    c_method = active_config.get("chunk_method") or "size"
+    c_size = int(active_config.get("chunk_size") or 500)
+    c_overlap = int(active_config.get("chunk_overlap") or 50)
 
-    # 3. Process and Index
-    try:
-        content = save_path.read_text(encoding="utf-8", errors="ignore")
-        # We use the raw variables here to be safe
-        chunks = chunk_text(content, {"chunk_size": c_size, "chunk_overlap": c_overlap}) 
-        num_indexed = index_file_chunks(project_name, file.filename, chunks)
-        print(f"Success: {file.filename} indexed into {num_indexed} chunks.")
-    except Exception as e:
-        print(f"Indexing failed for {file.filename}: {e}")
+    # 2. Iterate through the list of uploaded files
+    for uploaded_file in file:
+        save_path = upload_dir / uploaded_file.filename
+        
+        try:
+            # Save the file
+            with open(save_path, "wb") as buffer:
+                shutil.copyfileobj(uploaded_file.file, buffer)
+            
+            # Read content for indexing
+            content = save_path.read_text(encoding="utf-8", errors="ignore")
+            
+            # 3. Process and Index using the project's chosen method
+            # We pass the method along with size and overlap
+            chunks = chunk_text(
+                content, 
+                {
+                    "chunk_method": c_method, 
+                    "chunk_size": c_size, 
+                    "chunk_overlap": c_overlap
+                }
+            ) 
+            
+            num_indexed = index_file_chunks(project_name, uploaded_file.filename, chunks)
+            print(f"Success: {uploaded_file.filename} indexed ({c_method}) into {num_indexed} chunks.")
+            
+        except Exception as e:
+            print(f"Indexing failed for {uploaded_file.filename}: {e}")
+        finally:
+            # Ensure the file handle is closed to prevent WinError 32
+            uploaded_file.file.close()
 
-    # 4. Refresh the UI
+    # 4. Refresh the UI once after all files are processed
     files = get_project_files(project_name)
     return templates.TemplateResponse(
         request=request,
         name="partials/file_list_inner.html",
-        context={"request": request, "project_name": project_name, "files": files}
+        context={
+            "request": request, 
+            "project_name": project_name, 
+            "files": files
+        }
     )
 
 @router.delete("/files/delete/{project_name}/{filename}")
