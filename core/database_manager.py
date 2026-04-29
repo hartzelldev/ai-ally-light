@@ -39,12 +39,20 @@ class ProjectDatabase:
 
     def get_threads(self, limit: Optional[int] = None, offset: int = 0):
         """Fetches active threads, newest first."""
+        # Use last_updated to match your schema's column name
         query = "SELECT * FROM threads WHERE is_archived = 0 ORDER BY last_updated DESC"
         if limit:
             query += f" LIMIT {limit} OFFSET {offset}"
         
         with self._get_connection() as conn:
             return [dict(row) for row in conn.execute(query).fetchall()]
+
+    def get_thread_by_id(self, thread_id: int):
+        """Fetches a single thread by its ID. (Now correctly inside the class)"""
+        query = "SELECT * FROM threads WHERE id = ?"
+        with self._get_connection() as conn:
+            row = conn.execute(query, (thread_id,)).fetchone()
+            return dict(row) if row else None
 
     def get_messages(self, thread_id: int):
         """Fetches all messages for a specific thread to display in the chat."""
@@ -75,11 +83,4 @@ class ProjectDatabase:
                 "UPDATE threads SET last_updated = CURRENT_TIMESTAMP WHERE id = ?",
                 (thread_id,)
             )
-
-def get_thread_by_id(self, thread_id: int):
-    """Fetches a single thread by its ID."""
-    query = "SELECT * FROM threads WHERE id = ?"
-    with self._get_connection() as conn:
-        row = conn.execute(query, (thread_id,)).fetchone()
-        return dict(row) if row else None
-        
+            
