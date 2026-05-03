@@ -17,7 +17,7 @@ def index_page():
                         ui.icon('folder')
                     with ui.item_section():
                         ui.item_label('Projects')
-                        ui.item_label('Manage your novels and story bibles').props('caption')
+                        ui.item_label('Access and manage your organized knowledge bases and workspaces').props('caption')
 
                 with ui.item(on_click=lambda: ui.navigate.to('/settings')).props('clickable'):
                     with ui.item_section().props('avatar'):
