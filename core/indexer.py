@@ -109,4 +109,20 @@ def clear_entire_index(project_name: str):
         client.delete_collection(name=project_name)
     except Exception:
         pass
-        
+
+def reindex_single_file(project_name: str, file_path: Path):
+    """Processes a single file: deletes old index, chunks, and re-adds."""
+    from core.config_manager import get_active_config
+    
+    config = get_active_config(project_name)
+    content = file_path.read_text(encoding='utf-8', errors='ignore')
+    
+    # 1. Remove existing entries for this file
+    delete_file_from_index(project_name, file_path.name)
+    
+    # 2. Generate new chunks based on CURRENT settings
+    chunks = chunk_text(content, config)
+    
+    # 3. Add to vector DB
+    count = index_file_chunks(project_name, file_path.name, chunks)
+    return count
