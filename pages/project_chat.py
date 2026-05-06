@@ -1,48 +1,99 @@
-from nicegui import ui
 import datetime
-from pathlib import Path
 import json
+from pathlib import Path
+from nicegui import ui
 from utils.navigation import project_navigation_header, home_button
 from core.config_manager import get_active_config, PROJECTS_DIR, save_thread
 from core.indexer import query_vector_db
 from core.ai_logic import AIEngine
 
 def chat_page(project_name: str):
-    home_button()
-    project_navigation_header(project_name, current_page='chat')
-    
+    # --- State Management ---
+    history = []  
     config = get_active_config(project_name)
-    history = [] 
+    # Simple container for export data to avoid ui.state errors
+    export_container = {'text': '', 'folder': '', 'file': ''}
 
-    # --- Save Logic ---
+    # --- UI Helpers & Logic ---
+    def copy_to_clipboard(text: str):
+        escaped_text = text.replace('`', '\\`').replace("'", "\\'")
+        ui.run_javascript(f'navigator.clipboard.writeText(`{escaped_text}`)')
+        ui.notify("Response copied to clipboard")
 
-    def save_current_thread(name: str):
-            try:
-                saved_as = save_thread(project_name, name, history)
-                
-                ui.notify(f"Thread saved as {saved_as}", color='positive')
-                save_dialog.close()
-            except Exception as e:
-                ui.notify(f"Error saving thread: {e}", color='negative')
+    def finalize_export():
+        text = export_container['text']
+        folder = folder_input.value or ""
+        filename = file_input.value or ""
 
-    # --- Save Dialog ---
-    with ui.dialog() as save_dialog, ui.card().classes('q-pa-md'):
-        ui.label('Save Conversation').classes('text-h6')
-        name_input = ui.input('Thread Name', placeholder='e.g., Plot Brainstorming') \
-            .classes('w-full').on('keydown.enter', lambda: save_current_thread(name_input.value))
-        with ui.row().classes('w-full justify-end'):
-            ui.button('Cancel', on_click=save_dialog.close).props('flat')
-            ui.button('Save', on_click=lambda: save_current_thread(name_input.value))
+        if not filename:
+            ui.notify("Filename is required", type='warning')
+            return
+        
+        base_path = PROJECTS_DIR / project_name / "exports"
+        target_dir = base_path / folder.strip('/')
+        target_dir.mkdir(parents=True, exist_ok=True)
+        
+        if not filename.endswith(('.md', '.txt')):
+            filename += '.md'
+            
+        full_path = target_dir / filename
+        try:
+            full_path.write_text(text, encoding='utf-8')
+            ui.notify(f"Saved to exports/{folder}/{filename}", color='positive')
+            export_dialog.close()
+        except Exception as e:
+            ui.notify(f"File Error: {e}", color='negative')
 
+    def run_save_thread(name: str):
+        try:
+            saved_as = save_thread(project_name, name, history)
+            ui.notify(f"Thread saved as {saved_as}", color='positive')
+            save_thread_dialog.close()
+        except Exception as e:
+            ui.notify(f"Save Error: {e}", color='negative')
+
+    # --- Dialogs ---
+    with ui.dialog() as save_thread_dialog, ui.card().classes('q-pa-md w-80'):
+        ui.label('Save Conversation Thread').classes('text-h6')
+        thread_name_input = ui.input('Thread Name', placeholder='e.g., Plot Brainstorming') \
+            .classes('w-full').on('keydown.enter', lambda: run_save_thread(thread_name_input.value))
+        with ui.row().classes('w-full justify-end q-mt-md'):
+            ui.button('Cancel', on_click=save_thread_dialog.close).props('flat')
+            ui.button('Save', on_click=lambda: run_save_thread(thread_name_input.value))
+
+    with ui.dialog() as export_dialog, ui.card().classes('q-pa-md w-80'):
+        ui.label('Export AI Response').classes('text-h6')
+        folder_input = ui.input('Sub-folder (optional)', placeholder='drafts').classes('w-full')
+        file_input = ui.input('Filename', placeholder='response-notes').classes('w-full') \
+            .on('keydown.enter', finalize_export)
+        with ui.row().classes('w-full justify-end q-mt-md'):
+            ui.button('Cancel', on_click=export_dialog.close).props('flat')
+            ui.button('Export', on_click=finalize_export)
+
+    def open_export(text: str):
+        export_container['text'] = text
+        export_dialog.open()
+
+    # --- Main Chat Interaction ---
     @ui.refreshable
     def update_chat():
         with ui.column().classes('w-full q-pa-md'):
+            if not history:
+                ui.label(f'Start a conversation about {project_name.title()}...').classes('text-grey-5 text-italic mx-auto q-mt-xl')
+            
             for role, text in history:
                 with ui.column().classes('w-full q-mb-md'):
                     ui.html(f'<h3 style="margin:0; font-size: 1.1rem; font-weight: bold;">{role}</h3>')
                     bg_color = 'bg-blue-1' if role == 'You' else 'bg-grey-2'
-                    with ui.column().classes(f'q-pa-md {bg_color} rounded-borders w-full'):
+                    with ui.column().classes(f'q-pa-md {bg_color} rounded-borders w-full shadow-sm'):
                         ui.markdown(text).classes('w-full')
+                        
+                        if role == 'AI Ally':
+                            with ui.row().classes('w-full justify-end gap-2 q-mt-sm'):
+                                ui.button(icon='content_copy', on_click=lambda t=text: copy_to_clipboard(t)) \
+                                    .props('flat dense color=grey-7 aria-label="Copy response to clipboard"')
+                                ui.button(icon='download', on_click=lambda t=text: open_export(t)) \
+                                    .props('flat dense color=grey-7 aria-label="Export response to file"')
 
     def send_message():
         user_text = input_field.value
@@ -52,32 +103,34 @@ def chat_page(project_name: str):
         update_chat.refresh()
 
         context = query_vector_db(project_name, user_text)
-        full_system_prompt = f"{config.get('system_prompt', '')}\n\nContext:\n{context}"
-        api_messages = [{"role": "system", "content": full_system_prompt}]
-        for role, text in history[-5:]:
-            api_messages.append({"role": "user" if role == "You" else "assistant", "content": text})
+        system_prompt = config.get('system_prompt', 'You are a helpful assistant.')
+        api_messages = [{"role": "system", "content": f"{system_prompt}\n\nProject Context:\n{context}"}]
+        for r, t in history[-10:]:
+            api_messages.append({"role": "user" if r == "You" else "assistant", "content": t})
 
         engine = AIEngine(config)
-        response_text = engine.get_response(api_messages)
-        history.append(('AI Ally', response_text))
+        response = engine.get_response(api_messages)
+        history.append(('AI Ally', response))
         update_chat.refresh()
-        ui.notify("AI Response received.")
+        ui.notify("AI Response received")
 
-    # --- Layout ---
+    # --- Layout Structure ---
+    home_button()
+    project_navigation_header(project_name, current_page='chat')
+
     with ui.column().classes('w-full h-screen no-wrap'):
-        # Top Action Bar for Chat
         with ui.row().classes('w-full q-pa-sm bg-grey-1 border-b justify-end'):
-            ui.button('Save Thread', icon='save', on_click=save_dialog.open) \
-                .props('flat color=primary aria-label="Save current conversation"')
+            ui.button('Save Full Thread', icon='save', on_click=save_thread_dialog.open) \
+                .props('flat color=primary aria-label="Save this entire conversation thread"')
 
-        with ui.scroll_area().classes('flex-grow w-full max-w-3xl mx-auto'):
+        with ui.scroll_area().classes('flex-grow w-full max-w-4xl mx-auto'):
             update_chat()
 
         with ui.row().classes('w-full q-pa-md bg-white border-t justify-center'):
-            with ui.row().classes('w-full max-w-3xl items-center'):
-                input_field = ui.input(placeholder='Ask about your files...') \
+            with ui.row().classes('w-full max-w-4xl items-center gap-2'):
+                input_field = ui.input(placeholder='Ask a question...') \
                     .classes('flex-grow').on('keydown.enter', send_message) \
-                    .props('outlined rounded aria-label="Message input"')
+                    .props('outlined rounded aria-label="Chat input field"')
                 ui.button(icon='send', on_click=send_message) \
                     .props('round flat color=primary aria-label="Send message"')
                     
