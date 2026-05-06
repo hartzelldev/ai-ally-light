@@ -12,7 +12,7 @@ def home_button():
 def project_navigation_header(project_name: str, current_page: str):
     """
     Creates a consistent navigation bar for project-specific pages.
-    current_page: 'chat', 'files', or 'settings'
+    current_page: 'chat', 'files', 'settings', or 'threads'
     """
     display_name = project_name.replace("_", " ").title()
     
@@ -29,14 +29,15 @@ def project_navigation_header(project_name: str, current_page: str):
             .props(f'flat {"color=primary" if current_page == "files" else ""}') \
             .classes('font-bold' if current_page == 'files' else '')
 
+        # Threads Button
+        ui.button('Threads', icon='history',
+                  on_click=lambda: ui.navigate.to(f'/project/{project_name}/threads')) \
+            .props(f'flat {"color=primary" if current_page == "threads" else ""}') \
+            .classes('font-bold' if current_page == 'threads' else '')
+
         # Settings Button
         ui.button('Settings', icon='settings', 
                   on_click=lambda: ui.navigate.to(f'/project/{project_name}/settings')) \
             .props(f'flat {"color=primary" if current_page == "settings" else ""}') \
             .classes('font-bold' if current_page == 'settings' else '')
-
-        # Threads Button (Placeholder for your future feature)
-        ui.button('Threads', icon='history') \
-            .props('flat disable') \
-            .tooltip('Coming soon')
             
