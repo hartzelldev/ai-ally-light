@@ -126,3 +126,23 @@ def reindex_single_file(project_name: str, file_path: Path):
     # 3. Add to vector DB
     count = index_file_chunks(project_name, file_path.name, chunks)
     return count
+
+def sync_all_project_files(project_name: str):
+    """
+    Scans the project's files directory and ensures everything is indexed.
+    This is the main 'Update AI Memory' logic.
+    """
+    from core.config_manager import PROJECTS_DIR
+    files_dir = PROJECTS_DIR / project_name / "files"
+    
+    if not files_dir.exists():
+        return 0
+
+    total_chunks = 0
+    # Loop through every file in the project's files folder
+    for file_path in files_dir.iterdir():
+        if file_path.is_file():
+            # Uses your existing logic to delete old index and re-add
+            total_chunks += reindex_single_file(project_name, file_path)
+            
+    return total_chunks
