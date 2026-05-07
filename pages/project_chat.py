@@ -1,20 +1,39 @@
 import datetime
 import json
 from pathlib import Path
-from nicegui import ui
+from nicegui import ui, app, run  # Added 'run' to the imports here
 from utils.navigation import project_navigation_header, home_button
 from core.config_manager import get_active_config, PROJECTS_DIR, save_thread
 from core.indexer import query_vector_db
 from core.ai_logic import AIEngine
 
-def chat_page(project_name: str):
-    # --- State Management ---
-    history = []  
-    config = get_active_config(project_name)
-    # Simple container for export data to avoid ui.state errors
-    export_container = {'text': '', 'folder': '', 'file': ''}
+def chat_page(project_name: str, thread: str = None):
+    # --- 1. Robust State Management ---
+    class ChatState:
+        def __init__(self):
+            self.history = []
+            self.display_name = "New Conversation"
+            self.thread_id = thread
 
-    # --- UI Helpers & Logic ---
+    state = ChatState()
+
+    # Load existing thread if applicable
+    if state.thread_id:
+        thread_file = PROJECTS_DIR / project_name / "threads" / f"{state.thread_id}.json"
+        if thread_file.exists():
+            try:
+                with open(thread_file, 'r', encoding='utf-8') as f:
+                    loaded_data = json.load(f)
+                    state.history = [tuple(msg) for msg in loaded_data]
+                state.display_name = state.thread_id.replace('_', ' ')
+            except Exception as e:
+                ui.notify(f"Error loading thread: {e}", color='negative')
+
+    config = get_active_config(project_name)
+    export_container = {'text': '', 'folder': '', 'file': ''}
+    initial_save_name = state.thread_id if state.thread_id else datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
+
+    # --- 2. Logic Functions ---
     def copy_to_clipboard(text: str):
         escaped_text = text.replace('`', '\\`').replace("'", "\\'")
         ui.run_javascript(f'navigator.clipboard.writeText(`{escaped_text}`)')
@@ -24,7 +43,6 @@ def chat_page(project_name: str):
         text = export_container['text']
         folder = folder_input.value or ""
         filename = file_input.value or ""
-
         if not filename:
             ui.notify("Filename is required", type='warning')
             return
@@ -46,16 +64,18 @@ def chat_page(project_name: str):
 
     def run_save_thread(name: str):
         try:
-            saved_as = save_thread(project_name, name, history)
+            saved_as = save_thread(project_name, name, state.history)
             ui.notify(f"Thread saved as {saved_as}", color='positive')
+            state.thread_id = saved_as 
             save_thread_dialog.close()
+            title_label.set_content(f'<h2 style="margin:0; font-size: 1.2rem;">Active Thread: {saved_as.replace("_", " ")}</h2>')
         except Exception as e:
             ui.notify(f"Save Error: {e}", color='negative')
 
-    # --- Dialogs ---
+    # --- 3. Dialogs ---
     with ui.dialog() as save_thread_dialog, ui.card().classes('q-pa-md w-80'):
         ui.label('Save Conversation Thread').classes('text-h6')
-        thread_name_input = ui.input('Thread Name', placeholder='e.g., Plot Brainstorming') \
+        thread_name_input = ui.input('Thread Name', value=initial_save_name) \
             .classes('w-full').on('keydown.enter', lambda: run_save_thread(thread_name_input.value))
         with ui.row().classes('w-full justify-end q-mt-md'):
             ui.button('Cancel', on_click=save_thread_dialog.close).props('flat')
@@ -74,14 +94,14 @@ def chat_page(project_name: str):
         export_container['text'] = text
         export_dialog.open()
 
-    # --- Main Chat Interaction ---
+    # --- 4. Chat Rendering ---
     @ui.refreshable
     def update_chat():
         with ui.column().classes('w-full q-pa-md'):
-            if not history:
+            if not state.history:
                 ui.label(f'Start a conversation about {project_name.title()}...').classes('text-grey-5 text-italic mx-auto q-mt-xl')
             
-            for role, text in history:
+            for role, text in state.history:
                 with ui.column().classes('w-full q-mb-md'):
                     ui.html(f'<h3 style="margin:0; font-size: 1.1rem; font-weight: bold;">{role}</h3>')
                     bg_color = 'bg-blue-1' if role == 'You' else 'bg-grey-2'
@@ -95,33 +115,43 @@ def chat_page(project_name: str):
                                 ui.button(icon='download', on_click=lambda t=text: open_export(t)) \
                                     .props('flat dense color=grey-7 aria-label="Export response to file"')
 
-    def send_message():
+    async def send_message():
         user_text = input_field.value
-        if not user_text: return
-        history.append(('You', user_text))
+        if not user_text:
+            return
+
+        state.history.append(('You', user_text))
         input_field.value = ''
         update_chat.refresh()
 
         context = query_vector_db(project_name, user_text)
         system_prompt = config.get('system_prompt', 'You are a helpful assistant.')
+        
         api_messages = [{"role": "system", "content": f"{system_prompt}\n\nProject Context:\n{context}"}]
-        for r, t in history[-10:]:
+        for r, t in state.history[-10:]:
             api_messages.append({"role": "user" if r == "You" else "assistant", "content": t})
 
-        engine = AIEngine(config)
-        response = engine.get_response(api_messages)
-        history.append(('AI Ally', response))
-        update_chat.refresh()
-        ui.notify("AI Response received")
+        try:
+            engine = AIEngine(config)
+            # CHANGED: Use run.io_bound directly from the nicegui import
+            response = await run.io_bound(engine.get_response, api_messages)
+            
+            state.history.append(('AI Ally', response))
+            update_chat.refresh()
+            ui.notify("AI Response received")
+        except Exception as e:
+            ui.notify(f"AI Error: {e}", color='negative')
 
-    # --- Layout Structure ---
+    # --- 5. Page Layout ---
     home_button()
     project_navigation_header(project_name, current_page='chat')
 
     with ui.column().classes('w-full h-screen no-wrap'):
-        with ui.row().classes('w-full q-pa-sm bg-grey-1 border-b justify-end'):
-            ui.button('Save Full Thread', icon='save', on_click=save_thread_dialog.open) \
-                .props('flat color=primary aria-label="Save this entire conversation thread"')
+        with ui.row().classes('w-full q-pa-sm bg-blue-grey-1 border-b items-center justify-between'):
+            title_label = ui.html(f'<h2 style="margin:0; font-size: 1.2rem;">Active Thread: {state.display_name}</h2>')
+            
+            ui.button('Save Thread', icon='save', on_click=save_thread_dialog.open) \
+                .props('flat color=primary aria-label="Save or rename this conversation thread"')
 
         with ui.scroll_area().classes('flex-grow w-full max-w-4xl mx-auto'):
             update_chat()

@@ -1,4 +1,6 @@
 from nicegui import ui
+import os
+import secrets
 
 # Import page functions
 from pages.index import index_page
@@ -22,4 +24,8 @@ ui.page('/project/{project_name}/settings')(project_settings_page)
 ui.page('/project/{project_name}/files')(project_files_page)
 ui.page('/project/{project_name}/threads')(project_threads_page)
 
-ui.run(title="AI Ally Light", port=8082, reload=True)
+# Try to get the secret from the system environment
+# If it doesn't exist, generate a random one for this session only
+secret = os.environ.get('AI_ALLY_SECRET', secrets.token_urlsafe(32))
+
+ui.run(native=True, storage_secret=secret, title="AI Ally Light", port=8082, reload=True)
