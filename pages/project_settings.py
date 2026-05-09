@@ -66,12 +66,12 @@ def project_settings_page(project_name: str):
     config = get_project_config(project_name)
 
     with ui.column().classes('w-full max-w-4xl mx-auto q-pa-md'):
-        ui.label(f'Project Settings: {project_name.title()}').classes('text-h4 q-mb-md')
+        ui.markdown(f'# Project Settings: {project_name.title()}')
 
         # --- Section 1: Provider Override ---
         with ui.card().classes('w-full q-pa-md q-mb-md shadow-2'):
             with ui.row().classes('w-full items-center justify-between'):
-                ui.label('Model & Provider').classes('text-h6')
+                ui.markdown('## Model & Provider')
                 ui.checkbox('Override Global Provider').bind_value(config, 'override_provider') \
                     .on_value_change(lambda: provider_container.refresh())
 
@@ -89,7 +89,7 @@ def project_settings_page(project_name: str):
         # --- Section 2: Model Tuning ---
         with ui.card().classes('w-full q-pa-md q-mb-md shadow-2'):
             with ui.row().classes('w-full items-center justify-between'):
-                ui.label('Model Tuning').classes('text-h6')
+                ui.markdown('## Model Tuning')
                 ui.checkbox('Override Global Tuning').bind_value(config, 'override_tuning') \
                     .on_value_change(lambda: tuning_container.refresh())
 
@@ -108,7 +108,7 @@ def project_settings_page(project_name: str):
 
         # --- Section 3: RAG Strategy ---
         with ui.card().classes('w-full q-pa-md shadow-2 q-mb-md'):
-            ui.label('Knowledge Base (RAG)').classes('text-h6 q-mb-sm')
+            ui.markdown('## Knowledge Base (RAG)')
             ui.select(options={'size': 'By Size', 'delimiter': 'By Delimiter', 'full': 'Full'}, 
                       label='Method', on_change=lambda e: chunking_fields_container.refresh(e.value, config)) \
                 .classes('w-full').bind_value(config, 'embed_method')
@@ -116,7 +116,7 @@ def project_settings_page(project_name: str):
 
         # --- Section 4: Danger Zone (Rename/Delete) ---
         with ui.card().classes('w-full q-pa-md shadow-2 border-red-200'):
-            ui.label('Danger Zone').classes('text-h6 text-red')
+            ui.markdown('## Danger Zone')
             with ui.row().classes('w-full items-center gap-4 q-mb-md'):
                 r_input = ui.input(label='New Folder Name', value=project_name).classes('grow').props('outlined dense')
                 def do_rename():
