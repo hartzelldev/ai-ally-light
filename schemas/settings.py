@@ -25,6 +25,6 @@ class EmbeddingSettings(BaseModel):
 class GlobalConfig(BaseModel):
     chat: ChatSettings = ChatSettings()
     embeddings: EmbeddingSettings = EmbeddingSettings()
-    event_beep: bool = True
+    enable_sounds: bool = Field(default=True, description="Master toggle for audio cues")
     max_history_turns: int = 10
     max_shown_threads: int = 20

@@ -6,6 +6,7 @@ from utils.navigation import project_navigation_header, home_button
 from core.config_manager import get_active_config, PROJECTS_DIR, save_thread
 from core.indexer import query_vector_db
 from core.ai_logic import AIEngine
+from utils.audio import event_beep
 
 def chat_page(project_name: str, thread: str = None):
     # --- 1. Robust State Management ---
@@ -27,6 +28,7 @@ def chat_page(project_name: str, thread: str = None):
                     state.history = [tuple(msg) for msg in loaded_data]
                 state.display_name = state.thread_id.replace('_', ' ')
             except Exception as e:
+                event_beep('error')
                 ui.notify(f"Error loading thread: {e}", color='negative')
 
     config = get_active_config(project_name)
@@ -44,6 +46,7 @@ def chat_page(project_name: str, thread: str = None):
         folder = folder_input.value or ""
         filename = file_input.value or ""
         if not filename:
+            event_beep('info')
             ui.notify("Filename is required", type='warning')
             return
         
@@ -138,8 +141,10 @@ def chat_page(project_name: str, thread: str = None):
             
             state.history.append(('AI Ally', response))
             update_chat.refresh()
+            event_beep('complete')
             ui.notify("AI Response received")
         except Exception as e:
+            event_beep('error')
             ui.notify(f"AI Error: {e}", color='negative')
 
     # --- 5. Page Layout ---

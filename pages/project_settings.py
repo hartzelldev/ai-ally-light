@@ -1,8 +1,11 @@
 import json
 import os
+import shutil
+import re
 from pathlib import Path
 from nicegui import ui
 from utils.navigation import project_navigation_header, home_button
+from utils.audio import event_beep
 
 PROJECTS_DIR = Path("projects")
 
@@ -16,7 +19,6 @@ def get_project_config(project_name: str):
         except Exception as e:
             print(f"Error loading config: {e}")
     
-    # Defaults include the override flags
     return {
         'override_provider': False,
         'chat_provider': 'ollama',
@@ -32,7 +34,7 @@ def get_project_config(project_name: str):
     }
 
 def save_project_config(project_name: str, config_data: dict):
-    """Ensures directory existence and saves the configuration."""
+    """Saves the configuration to the project folder."""
     project_path = PROJECTS_DIR / project_name
     config_file = project_path / "project_config.json"
     try:
@@ -40,21 +42,23 @@ def save_project_config(project_name: str, config_data: dict):
             project_path.mkdir(parents=True, exist_ok=True)
         with open(config_file, 'w', encoding='utf-8') as f:
             json.dump(config_data, f, indent=4)
+        event_beep('info')
         ui.notify(f'Settings saved for {project_name.title()}', color='positive')
     except Exception as e:
+        event_beep('error')
         ui.notify(f'Error saving settings: {e}', color='negative')
 
 @ui.refreshable
 def chunking_fields_container(method: str, config: dict):
-    """Dynamically renders fields based on size, delimiter, or full context."""
+    """Dynamically renders RAG fields."""
     if method == 'size':
         with ui.row().classes('w-full gap-4'):
             ui.number(label='Chunk Size', format='%d').classes('col').bind_value(config, 'chunk_size')
             ui.number(label='Chunk Overlap', format='%d').classes('col').bind_value(config, 'chunk_overlap')
     elif method == 'delimiter':
-        ui.input(label='Custom Delimiter (e.g. \\n\\n)').classes('w-full').bind_value(config, 'delimiter')
+        ui.input(label='Custom Delimiter').classes('w-full').bind_value(config, 'delimiter')
     elif method == 'full':
-        ui.label('Full Context: The entire file will be processed as a single block.').classes('text-italic text-grey-7 q-pa-sm')
+        ui.label('Full Context: Entire file processed as one block.').classes('text-italic text-grey-7 q-pa-sm')
 
 def project_settings_page(project_name: str):
     home_button()
@@ -64,70 +68,79 @@ def project_settings_page(project_name: str):
     with ui.column().classes('w-full max-w-4xl mx-auto q-pa-md'):
         ui.label(f'Project Settings: {project_name.title()}').classes('text-h4 q-mb-md')
 
-        # --- Section 1: Provider & Model Override ---
+        # --- Section 1: Provider Override ---
         with ui.card().classes('w-full q-pa-md q-mb-md shadow-2'):
             with ui.row().classes('w-full items-center justify-between'):
                 ui.label('Model & Provider').classes('text-h6')
-                ui.checkbox('Override Global Provider', value=config.get('override_provider')) \
-                    .bind_value(config, 'override_provider') \
+                ui.checkbox('Override Global Provider').bind_value(config, 'override_provider') \
                     .on_value_change(lambda: provider_container.refresh())
 
             @ui.refreshable
             def provider_container():
                 if config.get('override_provider'):
                     with ui.column().classes('w-full q-mt-md gap-2'):
-                        ui.select(options=['ollama', 'groq', 'openrouter', 'gemini', 'together'], label='Provider') \
+                        ui.select(options=['ollama', 'groq', 'openrouter', 'gemini'], label='Provider') \
                             .classes('w-full').bind_value(config, 'chat_provider')
-                        ui.input(label='Model Name (e.g., llama3, mistral-small)') \
-                            .classes('w-full').bind_value(config, 'chat_model')
+                        ui.input(label='Model Name').classes('w-full').bind_value(config, 'chat_model')
                 else:
-                    ui.label('Using global provider and model settings.').classes('text-grey-7 q-mt-sm')
-            
+                    ui.label('Using global provider settings.').classes('text-grey-7')
             provider_container()
 
-        # --- Section 2: Model Tuning Override ---
+        # --- Section 2: Model Tuning ---
         with ui.card().classes('w-full q-pa-md q-mb-md shadow-2'):
             with ui.row().classes('w-full items-center justify-between'):
-                ui.label('Model Tuning (Temp, Prompt, Tokens)').classes('text-h6')
-                ui.checkbox('Override Global Tuning', value=config.get('override_tuning')) \
-                    .bind_value(config, 'override_tuning') \
+                ui.label('Model Tuning').classes('text-h6')
+                ui.checkbox('Override Global Tuning').bind_value(config, 'override_tuning') \
                     .on_value_change(lambda: tuning_container.refresh())
 
             @ui.refreshable
             def tuning_container():
                 if config.get('override_tuning'):
                     with ui.column().classes('w-full q-mt-md gap-4'):
-                        ui.textarea(label='Project System Prompt') \
-                            .classes('w-full').props('autogrow outlined') \
+                        ui.textarea(label='System Prompt').classes('w-full').props('autogrow outlined') \
                             .bind_value(config, 'system_prompt')
-                        
                         with ui.row().classes('w-full gap-4'):
-                            ui.number(label='Temperature', step=0.1, format='%.1f') \
-                                .classes('col').props('outlined') \
-                                .bind_value(config, 'temperature')
-                            ui.number(label='Max Tokens', step=256, format='%d') \
-                                .classes('col').props('outlined') \
-                                .bind_value(config, 'max_tokens')
+                            ui.number(label='Temperature', step=0.1).classes('col').bind_value(config, 'temperature')
+                            ui.number(label='Max Tokens', step=256).classes('col').bind_value(config, 'max_tokens')
                 else:
-                    ui.label('Using global personality and tuning settings.').classes('text-grey-7 q-mt-sm')
-            
+                    ui.label('Using global tuning settings.').classes('text-grey-7')
             tuning_container()
 
-        # --- Section 3: Data Chunking Strategy ---
-        with ui.card().classes('w-full q-pa-md shadow-2'):
-            ui.label('Knowledge Base Processing (RAG)').classes('text-h6 q-mb-sm')
-            method_select = ui.select(
-                options={'size': 'By Character Count', 'delimiter': 'By Custom Delimiter', 'full': 'Full Context'}, 
-                label='Chunking Method',
-                on_change=lambda e: chunking_fields_container.refresh(e.value, config)
-            ).classes('w-full').bind_value(config, 'embed_method')
+        # --- Section 3: RAG Strategy ---
+        with ui.card().classes('w-full q-pa-md shadow-2 q-mb-md'):
+            ui.label('Knowledge Base (RAG)').classes('text-h6 q-mb-sm')
+            ui.select(options={'size': 'By Size', 'delimiter': 'By Delimiter', 'full': 'Full'}, 
+                      label='Method', on_change=lambda e: chunking_fields_container.refresh(e.value, config)) \
+                .classes('w-full').bind_value(config, 'embed_method')
+            chunking_fields_container(config.get('embed_method'), config)
 
-            with ui.column().classes('w-full q-mt-md'):
-                chunking_fields_container(config.get('embed_method'), config)
+        # --- Section 4: Danger Zone (Rename/Delete) ---
+        with ui.card().classes('w-full q-pa-md shadow-2 border-red-200'):
+            ui.label('Danger Zone').classes('text-h6 text-red')
+            with ui.row().classes('w-full items-center gap-4 q-mb-md'):
+                r_input = ui.input(label='New Folder Name', value=project_name).classes('grow').props('outlined dense')
+                def do_rename():
+                    new_n = re.sub(r'[^\w\-]', '_', r_input.value.strip().replace(' ', '_')).lower()
+                    if not new_n or new_n == project_name: return
+                    try:
+                        os.rename(PROJECTS_DIR / project_name, PROJECTS_DIR / new_n)
+                        ui.navigate.to(f'/project/{new_n}/settings')
+                    except Exception as e: ui.notify(f"Error: {e}", color='negative')
+                ui.button('Rename', on_click=do_rename).props('color=grey-8')
 
-        # --- Footer Actions ---
-        with ui.row().classes('w-full justify-end q-mt-xl'):
-            ui.button('Save Project Settings', icon='save', color='positive', 
-                      on_click=lambda: save_project_config(project_name, config)) \
-                .props('unelevated size=lg aria-label="Save project-specific overrides"')
-                
+            with ui.dialog() as d_diag, ui.card().classes('q-pa-md'):
+                ui.label('Delete Project?').classes('text-h6 text-red')
+                ui.label('This is permanent.')
+                with ui.row().classes('w-full justify-end q-mt-md'):
+                    ui.button('Cancel', on_click=d_diag.close).props('flat')
+                    ui.button('Delete', color='red', on_click=lambda: [
+                        shutil.rmtree(PROJECTS_DIR / project_name),
+                        ui.navigate.to('/projects')
+                    ])
+            ui.button('Delete Project', icon='delete', color='red', on_click=d_diag.open)
+
+        # --- Save ---
+        with ui.row().classes('w-full justify-end q-mt-lg'):
+            ui.button('Save All Settings', icon='save', color='positive', 
+                      on_click=lambda: save_project_config(project_name, config)).props('size=lg')
+                      

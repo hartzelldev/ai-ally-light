@@ -1,6 +1,6 @@
 from nicegui import ui
 from utils.navigation import home_button
-
+from core.config_manager import manager  
 
 # --- UPDATED PROVIDER DATA ---
 CHAT_DEFAULTS = {
@@ -78,8 +78,9 @@ def global_settings_page():
                     .classes('col').props('outlined')
                 
                 # Sound notification toggle
-                ui.checkbox('Play Sound on AI Response Complete') \
-                    .classes('col')
+                ui.checkbox('Play sounds on AI response, errors, or other events that require attention') \
+                    .bind_value(manager.config, 'enable_sounds') \
+                    .on_value_change(lambda: manager.save_config(manager.config))
 
             ui.checkbox('Auto-scroll to bottom on new message', value=True)
 

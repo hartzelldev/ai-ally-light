@@ -4,6 +4,7 @@ from nicegui import ui, events
 from utils.navigation import project_navigation_header, home_button
 from core.config_manager import PROJECTS_DIR
 from core.indexer import sync_all_project_files, delete_file_from_index
+from utils.audio import event_beep
 
 def project_files_page(project_name: str):
     project_path = PROJECTS_DIR / project_name
@@ -39,6 +40,7 @@ def project_files_page(project_name: str):
             
         except Exception as ex:
             # This will now be caught by your new main.py logger too
+            event_beep('error')
             ui.notify(f'Upload failed: {ex}', color='negative', duration=0)
 
     def delete_file(filename: str):
@@ -59,8 +61,10 @@ def project_files_page(project_name: str):
         try:
             from nicegui import run
             chunks = await run.io_bound(sync_all_project_files, project_name)
+            event_beep('info')
             ui.notify(f'Indexed {chunks} content pieces!', color='positive')
         except Exception as e:
+            event_beep('error')
             ui.notify(f'Indexing error: {e}', color='negative')
         finally:
             dialog.close()
