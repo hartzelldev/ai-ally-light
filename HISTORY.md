@@ -1,5 +1,15 @@
 # AI Ally Light - Development History
 
+##v0.5 Beta (2026-05-11)
+
+Version 0.5 is a milestone release as, not only does it move the project into 'Beta' status, but it is a complete frontend overhaul from Flask to NiceGUI. This new framework and UI is more intuitive and much smoother.
+
+### New Features
+- **Thread Management:** * Added a Thread History dashboard with sorting by modification date.
+- **Auto-Save Engine:** Integrated a background save loop in project_chat.py that triggers after every AI response, ensuring no data loss during creative sessions.
+- **Export Tools:** New functionality to export AI responses directly into project sub-folders as Markdown files.
+- **Screen Reader Optimization:** * Standardized heading hierarchies (H1 through H3) for easier navigation with NVDA/JAWS, as well as audio cues for errors and other actions (AI response).
+
 ## v0.4 Alpha (2026-04-06)
 
 ### Features
