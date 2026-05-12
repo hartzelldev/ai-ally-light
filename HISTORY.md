@@ -1,6 +1,6 @@
 # AI Ally Light - Development History
 
-##v0.5 Beta (2026-05-11)
+##v0.5 Beta (2026-05-12)
 
 Version 0.5 is a milestone release as, not only does it move the project into 'Beta' status, but it is a complete frontend overhaul from Flask to NiceGUI. This new framework and UI is more intuitive and much smoother.
 
