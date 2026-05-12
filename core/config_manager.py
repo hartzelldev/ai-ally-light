@@ -4,12 +4,30 @@ from pathlib import Path
 from dotenv import load_dotenv
 from schemas.settings import GlobalConfig
 import datetime
+import sys
 
-# Set up paths
-BASE_DIR = Path(__file__).resolve().parent.parent
-CONFIG_PATH = BASE_DIR / "config.json"
-ENV_PATH = BASE_DIR / ".env"
-PROJECTS_DIR = Path("projects")
+def get_base_dir():
+    """
+    Determines the application root directory.
+    Uses sys.executable for bundled EXEs and __file__ for scripts.
+    """
+    if getattr(sys, 'frozen', False):
+        # We are running in a PyInstaller bundle
+        return Path(sys.executable).parent
+    
+    # We are running in a normal Python environment
+    # .parent.parent moves up from 'core/' to the root directory
+    return Path(__file__).parent.parent
+
+# --- Global Path Constants ---
+BASE_DIR = get_base_dir()
+PROJECTS_DIR = BASE_DIR / "projects"
+CONFIG_FILE = BASE_DIR / "config.json"
+ENV_FILE = BASE_DIR / ".env"
+
+# --- Initialization ---
+# This ensures the projects folder is there before any other module tries to use it
+PROJECTS_DIR.mkdir(parents=True, exist_ok=True)
 
 class ConfigManager:
     def __init__(self):
