@@ -46,4 +46,4 @@ def handle_exception(exception):
 # If it doesn't exist, generate a random one for this session only
 secret = os.environ.get('AI_ALLY_SECRET', secrets.token_urlsafe(32))
 
-ui.run(native=True, window_size=(1200, 800), storage_secret=secret, title="AI Ally Light", port=8082)
+ui.run(native=True, window_size=(1200, 800), storage_secret=secret, title="AI Ally Light", reload=False, port=native.find_open_port())

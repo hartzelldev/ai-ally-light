@@ -33,23 +33,23 @@ class ConfigManager:
     def __init__(self):
         self.config = self.load_config()
         # Load the global .env keys into the environment
-        load_dotenv(ENV_PATH)
+        load_dotenv(ENV_FILE)
 
     def load_config(self) -> GlobalConfig:
         """Loads JSON config and validates it with Pydantic."""
-        if not CONFIG_PATH.exists():
+        if not CONFIG_FILE.exists():
             # Create a default one if it doesn't exist
             default_config = GlobalConfig()
             self.save_config(default_config)
             return default_config
         
-        with open(CONFIG_PATH, "r") as f:
+        with open(CONFIG_FILE, "r") as f:
             data = json.load(f)
             return GlobalConfig(**data)
 
     def save_config(self, config: GlobalConfig):
         """Saves the Pydantic model back to JSON."""
-        with open(CONFIG_PATH, "w") as f:
+        with open(CONFIG_FILE, "w") as f:
             json.dump(config.model_dump(), f, indent=4)
         self.config = config
 
@@ -59,8 +59,8 @@ class ConfigManager:
             
             # Read existing lines
             lines = []
-            if ENV_PATH.exists():
-                with open(ENV_PATH, "r") as f:
+            if ENV_FILE.exists():
+                with open(ENV_FILE, "r") as f:
                     lines = f.readlines()
             
             # Update existing or add new
@@ -75,11 +75,11 @@ class ConfigManager:
             if not found:
                 lines.append(new_line)
                 
-            with open(ENV_PATH, "w") as f:
+            with open(ENV_FILE, "w") as f:
                 f.writelines(lines)
             
             # Reload environment variables so the app sees the change
-            load_dotenv(ENV_PATH, override=True)
+            load_dotenv(ENV_FILE, override=True)
 
     def get_api_key(self, provider_name: str) -> str:
         """
