@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 from dotenv import load_dotenv
 from schemas.settings import GlobalConfig
+import datetime
 
 # Set up paths
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -116,20 +117,27 @@ def get_active_config(project_name: str):
 
     return active_config
 
+
 def save_thread(project_name: str, name: str, history: list):
-    """Saves a chat thread to projects/[name]/threads/[name].json"""
+    """Saves a chat thread and returns the standardized safe name used for the file."""
     # Ensure name is filesystem safe
     safe_name = "".join([c for c in name if c.isalnum() or c in (' ', '-', '_')]).strip().replace(' ', '_')
+    
+    # Fallback for empty strings
     if not safe_name:
-        import datetime
         safe_name = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
 
     thread_path = PROJECTS_DIR / project_name / "threads"
     thread_path.mkdir(parents=True, exist_ok=True)
     
     file_path = thread_path / f"{safe_name}.json"
-    with open(file_path, 'w', encoding='utf-8') as f:
-        import json
-        json.dump(history, f, indent=4)
-    return safe_name
     
+    try:
+        with open(file_path, 'w', encoding='utf-8') as f:
+            json.dump(history, f, indent=4)
+        return safe_name
+    except Exception as e:
+        # We log it to the console for debugging, 
+        # but we don't crash the app.
+        print(f"FileSystem Error in save_thread: {e}")
+        return None

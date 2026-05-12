@@ -20,8 +20,13 @@ ui.page('/settings')(global_settings_page)
 ui.page('/about')(about_page)
 ui.page('/projects')(projects_dashboard)
 
-# --- Project Specific Routes
-ui.page('/project/{project_name}/chat')(chat_page)
+# --- Project Specific Routes ---
+# We add two decorators for chat: one for the base link and one for specific threads
+@ui.page('/project/{project_name}/chat/{thread}')
+@ui.page('/project/{project_name}/chat')
+def chat_entry(project_name: str, thread: str = None):
+    chat_page(project_name, thread)
+
 ui.page('/project/{project_name}/settings')(project_settings_page)
 ui.page('/project/{project_name}/files')(project_files_page)
 ui.page('/project/{project_name}/threads')(project_threads_page)
