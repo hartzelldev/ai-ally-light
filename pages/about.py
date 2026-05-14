@@ -7,7 +7,7 @@ def about_page():
     with ui.column().classes('w-full max-w-3xl mx-auto q-pa-md'):
         ui.markdown(f"""
         # About AI Ally Light
-        Version 0.5 Beta (2026-05-12)<br>
+        Version 0.5.1 Beta (2026-05-13)<br>
         Copyright 2026 Gary Hartzell<br>
         
         AI Ally Light is a **privacy-focused, local-first platform** designed to give you complete control over your AI interactions.         AI Ally Light was born from a professional need for a secure, accessible AI assistant that could handle sensitive technical documentation and long-form creative research without the privacy risks associated with cloud-based platforms.
@@ -30,18 +30,18 @@ def about_page():
         ui.separator().classes('q-my-lg')
 
         with ui.row().classes('w-full justify-center gap-4'):
-            ui.button('GitHub Project', icon='code', 
-                      on_click=lambda: ui.navigate.to('https://github.com/hartzelldev/ai-ally-light', new_tab=True)) \
-                .props('unelevated color=grey-9') \
-                .tooltip('View the source code (opens in browser)')
+            (ui.button('GitHub Project', icon='code', 
+                      on_click=lambda: ui.navigate.to('https://github.com/hartzelldev/ai-ally-light', new_tab=True)) 
+                .props('unelevated color=grey-9') 
+                .tooltip('View the source code (opens in browser)'))
 
-            ui.button('Download Page', icon='download', 
-                      on_click=lambda: ui.navigate.to('https://hartzelldev.github.io', new_tab=True)) \
-                .props('unelevated color=primary') \
-                .tooltip('Check for updates (opens in browser)')
+            (ui.button('Download Page', icon='download', 
+                      on_click=lambda: ui.navigate.to('https://hartzelldev.github.io', new_tab=True)) 
+                .props('unelevated color=primary') 
+                .tooltip('Check for updates (opens in browser)'))
 
-            ui.button('Contact Author', icon='mail', 
-                      on_click=lambda: ui.navigate.to('https://hartzelldev.github.io/contact.html', new_tab=True)) \
-                .props('unelevated color=secondary') \
-                .tooltip('Get in touch (opens in browser)')
+            (ui.button('Contact Author', icon='mail', 
+                      on_click=lambda: ui.navigate.to('https://hartzelldev.github.io/contact.html', new_tab=True)) 
+                .props('unelevated color=secondary') 
+                .tooltip('Get in touch (opens in browser)'))
 

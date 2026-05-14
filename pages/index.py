@@ -39,7 +39,7 @@ def index_page():
             # before the server vanishes
             ui.timer(1.0, lambda: os.kill(os.getpid(), signal.SIGINT), once=True)
 
-        ui.button('Exit Application', icon='power_settings_new', color='red', 
-                  on_click=handle_exit) \
-            .classes('q-mt-xl').props('flat')
+        (ui.button('Exit Application', icon='power_settings_new', color='red', 
+                  on_click=handle_exit) 
+            .classes('q-mt-xl').props('flat'))
             

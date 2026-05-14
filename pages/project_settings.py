@@ -54,13 +54,13 @@ def chunking_fields_container(method: str, config: dict):
     with ui.column().classes('w-full gap-2'):
         if method == 'size':
             with ui.row().classes('w-full gap-4'):
-                ui.number(label='Chunk Size', format='%d').classes('col').props('outlined') \
-                    .bind_value(config, 'chunk_size')
-                ui.number(label='Chunk Overlap', format='%d').classes('col').props('outlined') \
-                    .bind_value(config, 'chunk_overlap')
+                (ui.number(label='Chunk Size', format='%d').classes('col').props('outlined') 
+                    .bind_value(config, 'chunk_size'))
+                (ui.number(label='Chunk Overlap', format='%d').classes('col').props('outlined') 
+                    .bind_value(config, 'chunk_overlap'))
         elif method == 'delimiter':
-            ui.input(label='Custom Delimiter').classes('w-full').props('outlined') \
-                .bind_value(config, 'delimiter')
+            (ui.input(label='Custom Delimiter').classes('w-full').props('outlined') 
+                .bind_value(config, 'delimiter'))
         elif method == 'full':
             ui.label('Full Context: Entire file processed as one block.').classes('text-italic text-grey-7 q-pa-sm')
 
@@ -78,15 +78,15 @@ def project_settings_page(project_name: str):
         with ui.card().classes('w-full q-pa-md q-mb-md shadow-2'):
             with ui.row().classes('w-full items-center justify-between'):
                 ui.markdown('## Model & Provider')
-                ui.checkbox('Override Global Provider').bind_value(config, 'override_provider') \
-                    .on_value_change(lambda: provider_container.refresh())
+                (ui.checkbox('Override Global Provider').bind_value(config, 'override_provider') 
+                    .on_value_change(lambda: provider_container.refresh()))
 
             @ui.refreshable
             def provider_container():
                 if config.get('override_provider'):
                     with ui.column().classes('w-full q-mt-md gap-2'):
-                        ui.select(options=['ollama', 'groq', 'openrouter', 'together', 'gemini'], label='Provider') \
-                            .classes('w-full').props('outlined').bind_value(config, 'chat_provider')
+                        (ui.select(options=['ollama', 'groq', 'openrouter', 'together', 'gemini'], label='Provider') 
+                            .classes('w-full').props('outlined').bind_value(config, 'chat_provider'))
                         ui.input(label='Model Name').classes('w-full').props('outlined').bind_value(config, 'chat_model')
                 else:
                     ui.label('Using global provider settings.').classes('text-grey-7')
@@ -96,20 +96,20 @@ def project_settings_page(project_name: str):
         with ui.card().classes('w-full q-pa-md q-mb-md shadow-2'):
             with ui.row().classes('w-full items-center justify-between'):
                 ui.markdown('## Model Tuning')
-                ui.checkbox('Override Global Tuning').bind_value(config, 'override_tuning') \
-                    .on_value_change(lambda: tuning_container.refresh())
+                (ui.checkbox('Override Global Tuning').bind_value(config, 'override_tuning') 
+                    .on_value_change(lambda: tuning_container.refresh()))
 
             @ui.refreshable
             def tuning_container():
                 if config.get('override_tuning'):
                     with ui.column().classes('w-full q-mt-md gap-4'):
-                        ui.textarea(label='System Prompt').classes('w-full').props('autogrow outlined') \
-                            .bind_value(config, 'system_prompt')
+                        (ui.textarea(label='System Prompt').classes('w-full').props('autogrow outlined') 
+                            .bind_value(config, 'system_prompt'))
                         with ui.row().classes('w-full gap-4'):
-                            ui.number(label='Temperature', step=0.1).classes('col').props('outlined') \
-                                .bind_value(config, 'temperature')
-                            ui.number(label='Max Tokens', step=256).classes('col').props('outlined') \
-                                .bind_value(config, 'max_tokens')
+                            (ui.number(label='Temperature', step=0.1).classes('col').props('outlined') 
+                                .bind_value(config, 'temperature'))
+                            (ui.number(label='Max Tokens', step=256).classes('col').props('outlined') 
+                                .bind_value(config, 'max_tokens'))
                 else:
                     ui.label('Using global tuning settings.').classes('text-grey-7')
             tuning_container()
@@ -118,11 +118,11 @@ def project_settings_page(project_name: str):
         with ui.card().classes('w-full q-pa-md shadow-2 q-mb-md'):
             ui.markdown('## Knowledge Base (RAG)')
             # Important: Ensure the method is refreshed when the selection changes
-            ui.select(options={'size': 'By Size', 'delimiter': 'By Delimiter', 'full': 'Full'}, 
-                      label='Method') \
-                .classes('w-full').props('outlined') \
-                .bind_value(config, 'embed_method') \
-                .on_value_change(lambda e: chunking_fields_container.refresh(e.value, config))
+            (ui.select(options={'size': 'By Size', 'delimiter': 'By Delimiter', 'full': 'Full'}, 
+                      label='Method') 
+                .classes('w-full').props('outlined') 
+                .bind_value(config, 'embed_method') 
+                .on_value_change(lambda e: chunking_fields_container.refresh(e.value, config)))
             
             chunking_fields_container(config.get('embed_method', 'size'), config)
 

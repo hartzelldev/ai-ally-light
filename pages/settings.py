@@ -19,13 +19,14 @@ key_buffer = {p: manager.get_api_key(p) for p in CHAT_DEFAULTS.keys()}
 def chat_fields_container(provider):
     data = CHAT_DEFAULTS.get(provider, {"url": "", "link": "#"})
     with ui.column().classes('w-full gap-4'):
-        ui.input(label=f'{provider.title()} API Key', password=True) \
+        # 1. Create the input and bind it FIRST
+        pwd_input = ui.input(label=f'{provider.title()} API Key', password=True) \
             .classes('w-full').props('outlined') \
-            .set_enabled(provider != 'ollama') \
             .bind_value(key_buffer, provider)
         
-        ui.input(label='Base URL') \
-            .classes('w-full').props('outlined') \
+        pwd_input.set_enabled(provider != 'ollama')
+        
+        ui.input(label='Base URL').classes('w-full').props('outlined') \
             .bind_value(manager.config.chat, 'base_url')
 
 @ui.refreshable
@@ -33,13 +34,21 @@ def embed_fields_container(method):
     with ui.column().classes('w-full gap-4 q-mt-md'):
         if method == 'size':
             with ui.row().classes('w-full gap-4'):
-                ui.number(label='Chunk Size').classes('col').props('outlined') \
-                    .bind_value(manager.config.embeddings, 'chunk_size')
-                ui.number(label='Overlap').classes('col').props('outlined') \
-                    .bind_value(manager.config.embeddings, 'chunk_overlap')
+                (ui.number(label='Chunk Size')
+                    .classes('col')
+                    .props('outlined')
+                    .bind_value(manager.config.embeddings, 'chunk_size'))
+                
+                (ui.number(label='Overlap')
+                    .classes('col')
+                    .props('outlined')
+                    .bind_value(manager.config.embeddings, 'chunk_overlap'))
+
         elif method == 'delimiter':
-            ui.input(label='Delimiter String').classes('w-full').props('outlined') \
-                .bind_value(manager.config.embeddings, 'delimiter')
+            (ui.input(label='Delimiter String')
+                .classes('w-full')
+                .props('outlined')
+                .bind_value(manager.config.embeddings, 'delimiter'))
 
 def global_settings_page():
     home_button()
@@ -78,14 +87,16 @@ def global_settings_page():
             
             chat_fields_container(c_cfg.provider)
             
-            ui.textarea(label='Global System Prompt').classes('w-full q-mt-md').props('outlined autogrow') \
-                .bind_value(c_cfg, 'system_prompt')
+            (ui.textarea(label='Global System Prompt')
+                .classes('w-full q-mt-md')
+                .props('outlined autogrow')
+                .bind_value(c_cfg, 'system_prompt'))
             
             with ui.row().classes('w-full gap-4 q-mt-md'):
-                ui.number(label='Max Tokens', step=256).classes('col').props('outlined') \
-                    .bind_value(c_cfg, 'max_tokens')
-                ui.number(label='Temperature', step=0.1).classes('col').props('outlined') \
-                    .bind_value(c_cfg, 'temperature')
+                (ui.number(label='Max Tokens', step=256).classes('col').props('outlined')
+                    .bind_value(c_cfg, 'max_tokens'))
+                (ui.number(label='Temperature', step=0.1).classes('col').props('outlined')
+                    .bind_value(c_cfg, 'temperature'))
 
         # --- Knowledge Base (RAG) Settings ---
         with ui.card().classes('w-full q-pa-md q-mb-lg'):
@@ -102,12 +113,12 @@ def global_settings_page():
             ui.markdown('## UI & Accessibility')
             
             with ui.row().classes('w-full items-center gap-8'):
-                ui.number(label='Max Thread History (Memory)') \
-                    .classes('col').props('outlined') \
-                    .bind_value(g_cfg, 'max_history_turns')
+                (ui.number(label='Max Thread History (Memory)') 
+                    .classes('col').props('outlined')
+                    .bind_value(g_cfg, 'max_history_turns'))
                 
-                ui.checkbox('Enable Audio Cues') \
-                    .bind_value(g_cfg, 'enable_sounds')
+                (ui.checkbox('Enable Audio Cues')
+                    .bind_value(g_cfg, 'enable_sounds'))
 
         # --- Actions ---
         with ui.row().classes('w-full justify-end gap-4 q-mt-md'):
