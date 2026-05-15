@@ -1,11 +1,11 @@
 import os
 import re
+import sys
 from nicegui import ui
 from pathlib import Path
 from utils.navigation import home_button
 from utils.audio import event_beep
-
-PROJECTS_DIR = Path("projects")
+from core.config_manager import PROJECTS_DIR
 
 def create_new_project(name: str, refresh_func, dialog):
     """Creates a new project folder structure and refreshes the list."""
@@ -15,7 +15,6 @@ def create_new_project(name: str, refresh_func, dialog):
         return
     
     # SECURITY: Sanitize name to prevent path traversal or illegal characters
-    # Only allows alphanumeric, underscores, and hyphens.
     safe_name = re.sub(r'[^\w\-]', '_', name.strip().replace(' ', '_')).lower()
     project_path = PROJECTS_DIR / safe_name
     
@@ -26,6 +25,7 @@ def create_new_project(name: str, refresh_func, dialog):
 
     try:
         # Create standard project directory structure
+        # Using parents=True and absolute pathing to handle Scoop junctions better
         project_path.mkdir(parents=True, exist_ok=True)
         (project_path / "threads").mkdir(exist_ok=True)
         (project_path / "files").mkdir(exist_ok=True)
@@ -41,9 +41,18 @@ def create_new_project(name: str, refresh_func, dialog):
 def projects_list_container():
     """Renders the list of current projects."""
     if not PROJECTS_DIR.exists():
-        PROJECTS_DIR.mkdir(parents=True, exist_ok=True)
+        try:
+            PROJECTS_DIR.mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            ui.label(f'Error accessing projects directory: {e}').classes('text-negative')
+            return
 
-    project_names = sorted([d for d in os.listdir(PROJECTS_DIR) if (PROJECTS_DIR / d).is_dir()])
+    # Use absolute path for listdir to avoid shim ambiguity
+    try:
+        project_names = sorted([d for d in os.listdir(str(PROJECTS_DIR)) if (PROJECTS_DIR / d).is_dir()])
+    except Exception as e:
+        ui.label(f'Read Error: {e}').classes('text-negative')
+        return
 
     if not project_names:
         ui.label('No projects found. Create a new one to get started!').classes('text-italic text-grey-7 q-pa-lg')
@@ -55,7 +64,7 @@ def projects_list_container():
                         with ui.column():
                             display_name = name.replace('_', ' ').title()
                             ui.label(display_name).classes('text-h6')
-                            ui.label(f'Location: projects/{name}').classes('text-caption')
+                            ui.label(f'ID: {name}').classes('text-caption text-grey-6')
                         
                         ui.button(f'Open {display_name}', on_click=lambda n=name: ui.navigate.to(f'/project/{n}/chat')) \
                             .props('flat color=primary icon=launch')
@@ -78,7 +87,6 @@ def projects_dashboard():
         with ui.row().classes('w-full items-center justify-between'):
             home_button()
             ui.label('Project Library').classes('text-h4')
-            # Add the button that triggers our new dialog
             ui.button('New Project', icon='add', on_click=new_project_dialog.open) \
                 .props('unelevated color=positive aria-label="Create a new project folder"')
 
@@ -86,4 +94,3 @@ def projects_dashboard():
 
         # This container refreshes when a new project is created
         projects_list_container()
-        

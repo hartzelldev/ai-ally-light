@@ -6,6 +6,8 @@ from schemas.settings import GlobalConfig
 import datetime
 import sys
 
+__version__ = "0.5.2-beta"
+
 def get_base_dir():
     """
     Determines the application root directory.
@@ -101,8 +103,8 @@ def get_active_config(project_name: str):
     from pathlib import Path
 
     # 1. Setup paths
-    projects_dir = Path("projects")
-    global_config_path = Path("config.json")
+    projects_dir = PROJECTS_DIR
+    global_config_path = CONFIG_FILE
     project_config_path = projects_dir / project_name / "project_config.json"
 
     # 2. Start with a baseline dictionary of defaults

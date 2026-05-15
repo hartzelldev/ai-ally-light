@@ -3,8 +3,7 @@ import json
 from pathlib import Path
 from utils.navigation import project_navigation_header, home_button
 from pages.project_chat import update_last_active_thread
-
-PROJECTS_DIR = Path(__file__).parent.parent / "projects"
+from core.config_manager import PROJECTS_DIR
 
 def get_threads(project_name: str):
     """Returns a list of thread files for the project."""
