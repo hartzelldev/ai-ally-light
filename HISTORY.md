@@ -1,5 +1,13 @@
 # AI Ally Light - Development History
 
+##v 0.5.2 Beta (2026-05-14)
+
+### Bug fixes
+- Resolved an issue where the application would fail to find the projects directory when launched via Scoop shims or external symlinks.
+- Centralized path management in core/config_manager.py. The application now utilizes absolute path resolution at runtime, ensuring consistent access to configuration, environment variables, and project data across all installation methods (Portable, Scoop, or Source).
+
+---
+
 ##v0.5.1 Beta (2026-05-13)
 
 ### Bug fixes

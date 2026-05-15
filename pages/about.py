@@ -1,5 +1,6 @@
 from nicegui import ui
 from utils.navigation import home_button
+from core.config_manager import __version__, __release_date__
 
 def about_page():
     home_button()
@@ -7,7 +8,7 @@ def about_page():
     with ui.column().classes('w-full max-w-3xl mx-auto q-pa-md'):
         ui.markdown(f"""
         # About AI Ally Light
-        Version 0.5.1 Beta (2026-05-13)<br>
+        Version {__version__} ({__release_date__})<br>
         Copyright 2026 Gary Hartzell<br>
         
         AI Ally Light is a **privacy-focused, local-first platform** designed to give you complete control over your AI interactions.         AI Ally Light was born from a professional need for a secure, accessible AI assistant that could handle sensitive technical documentation and long-form creative research without the privacy risks associated with cloud-based platforms.

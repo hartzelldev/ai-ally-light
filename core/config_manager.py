@@ -7,6 +7,7 @@ import datetime
 import sys
 
 __version__ = "0.5.2-beta"
+__release_date__ = "2026-05-14"
 
 def get_base_dir():
     """
