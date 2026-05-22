@@ -149,7 +149,7 @@ def chat_page(project_name: str, thread: str = None):
         update_chat.refresh()
         await auto_save_logic()
         
-        context = query_vector_db(project_name, user_text)
+        context = await run.io_bound(query_vector_db, project_name, user_text)
         system_prompt = config.get('system_prompt', 'You are a helpful assistant.')
         
         api_messages = [{"role": "system", "content": f"{system_prompt}\n\nProject Context:\n{context}"}]
