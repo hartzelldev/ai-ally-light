@@ -86,7 +86,15 @@ def chat_page(project_name: str, thread: str = None):
     def finalize_export():
         folder = folder_input.value or ""
         filename = file_input.value or "export"
-        target_dir = PROJECTS_DIR / project_name / "exports" / folder.strip('/')
+        
+        # IMPROVEMENT: Target the OS user's native 'Documents' folder
+        documents_dir = Path.home() / "Documents"
+        
+        # Create a standardized parent folder for your app so documents stay clean
+        app_export_dir = documents_dir / "AI Ally Light Exports"
+        
+        # Append the project name and the user's custom subdirectory inputs
+        target_dir = app_export_dir / project_name / folder.strip('/')
         target_dir.mkdir(parents=True, exist_ok=True)
         
         if not filename.endswith(('.md', '.txt')):
@@ -94,7 +102,9 @@ def chat_page(project_name: str, thread: str = None):
             
         full_path = target_dir / filename
         full_path.write_text(export_container['text'], encoding='utf-8')
-        ui.notify(f"Saved to exports/{folder}/{filename}")
+        
+        # Notify user of the exact system-friendly location
+        ui.notify(f"Exported to Documents/AI Ally Light Exports/{project_name}/{folder}/{filename}".replace('//', '/'))
         export_dialog.close()
 
     def run_save_thread(name: str):
