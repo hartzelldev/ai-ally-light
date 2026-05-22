@@ -42,6 +42,8 @@ def chat_page(project_name: str, thread: str = None):
             # Check for thread in URL first, then config
             self.thread_id = thread or get_last_active_thread(project_name)
             self.display_name = "New Conversation"
+            # Flag to handle the UX loading/thinking status
+            self.is_thinking = False
 
     state = ChatState()
 
@@ -124,7 +126,7 @@ def chat_page(project_name: str, thread: str = None):
     @ui.refreshable
     def update_chat():
         with ui.column().classes('w-full q-pa-md'):
-            if not state.history:
+            if not state.history and not state.is_thinking:
                 ui.label(f'Start a conversation about {project_name.title()}...').classes('text-grey-5 text-italic mx-auto q-mt-xl')
             
             for role, text in state.history:
@@ -140,31 +142,49 @@ def chat_page(project_name: str, thread: str = None):
                                 ui.button(icon='download', on_click=lambda t=text: [export_container.update({'text': t}), export_dialog.open()]) \
                                     .props('flat dense color=grey-7 aria-label="Export response"')
 
+            # Thinking Indicator UI block appended at the bottom of the loop
+            if state.is_thinking:
+                with ui.column().classes('w-full q-mb-md'):
+                    ui.html('<h3 style="margin:0; font-size: 1.1rem; font-weight: bold;">AI Ally</h3>')
+                    with ui.row().classes('w-full q-pa-md bg-grey-2 rounded-borders shadow-sm items-center gap-2'):
+                        ui.spinner(size='sm', color='primary')
+                        ui.label('Ally is thinking...').classes('text-italic text-grey-7')
+
     async def send_message():
         user_text = input_field.value
         if not user_text: return
         
         state.history.append(('You', user_text))
         input_field.value = ''
+        
+        # Turn thinking status on and refresh layout to render spinner immediately
+        state.is_thinking = True
         update_chat.refresh()
         await auto_save_logic()
         
-        context = await run.io_bound(query_vector_db, project_name, user_text)
-        system_prompt = config.get('system_prompt', 'You are a helpful assistant.')
-        
-        api_messages = [{"role": "system", "content": f"{system_prompt}\n\nProject Context:\n{context}"}]
-        # Load last 10 messages for context
-        for r, t in state.history[-10:]:
-            api_messages.append({"role": "user" if r == "You" else "assistant", "content": t})
-
         try:
+            context = await run.io_bound(query_vector_db, project_name, user_text)
+            system_prompt = config.get('system_prompt', 'You are a helpful assistant.')
+            
+            api_messages = [{"role": "system", "content": f"{system_prompt}\n\nProject Context:\n{context}"}]
+            # Load last 10 messages for context
+            for r, t in state.history[-10:]:
+                api_messages.append({"role": "user" if r == "You" else "assistant", "content": t})
+
             engine = AIEngine(config)
             response = await run.io_bound(engine.get_response, api_messages)
             state.history.append(('AI Ally', response))
+            
+            # Request successful: drop the thinking indicator flag
+            state.is_thinking = False
             update_chat.refresh()
             await auto_save_logic()
             event_beep('complete')
         except Exception as e:
+            # Fallback: clear thinking indicator flag on errors so UI does not lock up
+            state.is_thinking = False
+            update_chat.refresh()
+            
             event_beep('error')
             ui.notify(f"Error: {e}", color='negative')
 
