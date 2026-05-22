@@ -2,6 +2,23 @@ import chromadb
 from pathlib import Path
 from typing import List
 from core.config_manager import get_active_config, PROJECTS_DIR
+import os
+import logging
+
+# 1. Tell Hugging Face Hub and Transformers to only log actual system errors
+os.environ["TRANSFORMERS_VERBOSITY"] = "error"
+os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
+
+# 2. Silence them if they are already imported/initialized
+try:
+    import transformers
+    transformers.logging.set_verbosity_error()
+except ImportError:
+    pass
+
+# 3. Catch standard noisy loggers that Chroma dependencies spin up
+logging.getLogger("chromadb").setLevel(logging.ERROR)
+logging.getLogger("huggingface_hub").setLevel(logging.ERROR)
 
 def get_vector_db(project_name: str, config: dict):
     """
