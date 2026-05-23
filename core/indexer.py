@@ -5,18 +5,10 @@ from core.config_manager import get_active_config, PROJECTS_DIR
 import os
 import logging
 
-# 1. Tell Hugging Face Hub and Transformers to only log actual system errors
-os.environ["TRANSFORMERS_VERBOSITY"] = "error"
+# 1. Tell Hugging Face Hub to remain quiet and disable progress meters
 os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
 
-# 2. Silence them if they are already imported/initialized
-try:
-    import transformers
-    transformers.logging.set_verbosity_error()
-except ImportError:
-    pass
-
-# 3. Catch standard noisy loggers that Chroma dependencies spin up
+# 2. Silence the high-volume loggers that Chroma dependencies spin up
 logging.getLogger("chromadb").setLevel(logging.ERROR)
 logging.getLogger("huggingface_hub").setLevel(logging.ERROR)
 
@@ -25,25 +17,22 @@ def get_vector_db(project_name: str, config: dict):
     Initializes or connects to a local ChromaDB for a specific project.
     Standardizes on the 'embeddings' directory within the project folder.
     """
-    # PATH FIX: Standardizing on projects/[name]/embeddings
     db_path = PROJECTS_DIR / project_name / "embeddings"
     
     provider = config.get("embed_provider", "builtin")
 
     if provider == "builtin":
-        from chromadb.utils import embedding_functions
-        selected_ef = embedding_functions.SentenceTransformerEmbeddingFunction(
-            model_name="all-MiniLM-L6-v2"
-        )
+        # Swapped out heavy SentenceTransformers for the lightweight ONNX engine
+        from chromadb.utils.embedding_functions import ONNXMiniLM_L6_V2
+        selected_ef = ONNXMiniLM_L6_V2()
     else:
         try:
             from providers.embeddings import get_remote_embedding_function
             selected_ef = get_remote_embedding_function(config)
         except ImportError:
-            from chromadb.utils import embedding_functions
-            selected_ef = embedding_functions.SentenceTransformerEmbeddingFunction(
-                model_name="all-MiniLM-L6-v2"
-            )
+            # Fallback block updated to look for the same lightweight ONNX engine
+            from chromadb.utils.embedding_functions import ONNXMiniLM_L6_V2
+            selected_ef = ONNXMiniLM_L6_V2()
 
     client = chromadb.PersistentClient(path=str(db_path))
     
@@ -73,7 +62,6 @@ def query_vector_db(project_name: str, query_text: str, n_results: int = 5):
 
 def chunk_text(text: str, config: dict) -> List[str]:
     """Breaks text into pieces based on the user's project settings."""
-    # Logic mapping display names to the internal strategy
     method = config.get("embed_method", "size") 
     
     if method == "full":
@@ -156,10 +144,8 @@ def sync_all_project_files(project_name: str):
         return 0
 
     total_chunks = 0
-    # Loop through every file in the project's files folder
     for file_path in files_dir.iterdir():
         if file_path.is_file():
-            # Uses your existing logic to delete old index and re-add
             total_chunks += reindex_single_file(project_name, file_path)
             
     return total_chunks
