@@ -1,6 +1,6 @@
 # AI Ally Light - CHANGELOG
 
-##v0.5.3 Beta (2026-05-23)
+##v0.6.0 Beta (2026-05-23)
 
 ### New Features
 - Implemented a "Thinking..." status UI indicator and loading spinner to provide real-time user feedback during background processing.
@@ -8,6 +8,7 @@
 - Integrated a native client-side event handler to enable `Shift+Enter` for inserting newlines while keeping a standard `Enter` keypress mapped to message submission.
 
 ### Changed
+- Re-architected the local embedding pipeline in `indexer.py` to utilize the lightweight `ONNXMiniLM_L6_V2` engine, completely dropping the heavy Python PyTorch (`torch`) and `sentence-transformers` frameworks.
 - Relocated the file export architecture out of the application root directory and into the native OS user profile `Documents/AI Ally Light Exports/` path for cleaner file management and improved accessibility.
 
 ### Fixed
