@@ -211,9 +211,15 @@ def chat_page(project_name: str, thread: str = None):
             update_chat()
 
         with ui.row().classes('w-full q-pa-md bg-white border-t justify-center'):
-            with ui.row().classes('w-full max-w-4xl items-center gap-2'):
-                input_field = ui.input(placeholder='Ask a question...') \
-                    .classes('flex-grow').on('keydown.enter', send_message) \
-                    .props('outlined rounded aria-label="Chat input field"')
+            with ui.row().classes('w-full max-w-4xl items-end gap-2'):
+                
+                input_field = (ui.textarea(placeholder='Ask a question... (Shift+Enter for newline)')
+                    .classes('flex-grow')
+                    .props('outlined rounded autogrow aria-label="Chat input field"'))
+                
+                # Capture standard Enter to submit, while allowing Shift+Enter to drop down cleanly
+                input_field.on('keydown', send_message, 
+                    js_handler='''(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); emit(e); } }''')
+
                 ui.button(icon='send', on_click=send_message) \
                     .props('round flat color=primary aria-label="Send message"')
