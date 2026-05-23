@@ -6,8 +6,8 @@ from schemas.settings import GlobalConfig
 import datetime
 import sys
 
-__version__ = "0.5.2-beta"
-__release_date__ = "2026-05-14"
+__version__ = "0.5.3-beta"
+__release_date__ = "2026-05-23"
 
 def get_base_dir():
     """

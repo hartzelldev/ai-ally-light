@@ -1,4 +1,21 @@
-# AI Ally Light - Development History
+# AI Ally Light - CHANGELOG
+
+##v0.5.3 Beta (2026-05-23)
+
+### New Features
+- Implemented a "Thinking..." status UI indicator and loading spinner to provide real-time user feedback during background processing.
+- Swapped the chat input to a multi-line `ui.textarea` component featuring layout `autogrow`.
+- Integrated a native client-side event handler to enable `Shift+Enter` for inserting newlines while keeping a standard `Enter` keypress mapped to message submission.
+
+### Changed
+- Relocated the file export architecture out of the application root directory and into the native OS user profile `Documents/AI Ally Light Exports/` path for cleaner file management and improved accessibility.
+
+### Fixed
+- Fixed an intermittent frontend synchronization issue where finished AI completions would stall on WebSockets and fail to render until the user manually changed active view tabs.
+- Resolved an internal event loop starvation bug by wrapping the synchronous ChromaDB `query_vector_db` pipeline inside an asynchronous `run.io_bound()` background worker thread.
+- Silenced high-volume, repetitive informational logging from Hugging Face transformers, tokenizers, and hub dependencies in the system console to ensure a clean terminal output.
+
+---
 
 ##v 0.5.2 Beta (2026-05-14)
 
