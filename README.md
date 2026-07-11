@@ -1,4 +1,4 @@
-# AI Ally Light (v0.6.0 Beta)
+# AI Ally Light (v0.6.1 Beta)
 
 **AI Ally Light** is a modular, text-first AI development toolbox designed for power users and developers who value accessibility, local data control, and extensible AI workflows. Built with a focus on screen-reader compatibility and a "Safe-by-Design" security posture, it bridges the gap between complex AI agents and the streamlined efficiency of a command-line interface.
 

@@ -1,5 +1,12 @@
 # AI Ally Light - CHANGELOG
 
+## v0.6.1 Beta (2026-07-11)
+
+### Fixed
+- Resolved a deployment issue where missing onnxruntime dependencies caused backend connection errors on certain Windows environments. All required dynamic link libraries are now bundled directly into the distribution.
+
+---
+
 ##v0.6.0 Beta (2026-05-23)
 
 ### New Features
